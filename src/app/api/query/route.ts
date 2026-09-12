@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { embedQuery } from '@/lib/pipeline/embedder';
 import { searchClauses, filterClauses } from '@/lib/db/clauses';
 import { getContract } from '@/lib/db/contracts';
-import { createServerClient } from '@/lib/db/client';
 import type { QueryRequest, QueryResponse, QueryResult, Clause } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -121,14 +120,19 @@ export async function POST(request: NextRequest) {
 
     // Fetch contract info for each unique contract_id
     const contractIds = [...new Set(results.map((r) => r.contract_id))];
-    const supabase = createServerClient();
-    const { data: contracts } = await supabase
-      .from('contracts')
-      .select('id, name, metadata')
-      .in('id', contractIds);
+    const contractMap = new Map<string, { id: string; name: string; metadata: Record<string, unknown> }>();
 
-    const contractMap = new Map(
-      (contracts || []).map((c) => [c.id, c])
+    await Promise.all(
+      contractIds.map(async (cid) => {
+        const c = await getContract(cid);
+        if (c) {
+          contractMap.set(cid, {
+            id: c.id,
+            name: c.name,
+            metadata: c.metadata as Record<string, unknown>,
+          });
+        }
+      })
     );
 
     const queryResults: QueryResult[] = results.map((clause) => ({

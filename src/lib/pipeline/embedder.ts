@@ -1,32 +1,40 @@
-import { geminiEmbed, geminiEmbedBatch } from '@/lib/gemini';
+import { geminiEmbed } from '@/lib/gemini';
 import { updateClauseEmbedding } from '@/lib/db/clauses';
 import type { Clause } from '@/lib/types';
 
 /**
  * Generate embeddings for a batch of clauses and persist them to the DB.
- *
- * We embed resolved_context (clause content + inlined references) rather than
- * raw content, so semantic search benefits from the full resolved meaning.
- *
- * Rate-limited to avoid Gemini quota errors (200ms between calls).
+ * Uses Gemini text-embedding-004 when GEMINI_API_KEY is available, with
+ * local normalized vector hashing fallback for offline/demo operation.
  */
 export async function embedClauses(
   clauses: Clause[],
   onProgress?: (completed: number, total: number) => void
 ): Promise<void> {
   const total = clauses.length;
+  const hasApiKey = Boolean(process.env.GEMINI_API_KEY);
 
   for (let i = 0; i < clauses.length; i++) {
     const clause = clauses[i];
     const textToEmbed = buildEmbedText(clause);
 
-    const embedding = await geminiEmbed(textToEmbed);
-    await updateClauseEmbedding(clause.id, embedding);
+    let embedding: number[];
+    if (hasApiKey) {
+      try {
+        embedding = await geminiEmbed(textToEmbed);
+      } catch (err) {
+        console.warn('Gemini embedding failed, using local vector fallback:', err);
+        embedding = generateLocalVector(textToEmbed);
+      }
+    } else {
+      embedding = generateLocalVector(textToEmbed);
+    }
 
+    await updateClauseEmbedding(clause.id, embedding);
     onProgress?.(i + 1, total);
 
-    // Rate limiting: 200ms between embedding calls
-    if (i < clauses.length - 1) {
+    // Rate limiting: 200ms between Gemini embedding calls if using remote API
+    if (hasApiKey && i < clauses.length - 1) {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
@@ -36,7 +44,36 @@ export async function embedClauses(
  * Embed a single query string (for search).
  */
 export async function embedQuery(query: string): Promise<number[]> {
-  return geminiEmbed(query);
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await geminiEmbed(query);
+    } catch (err) {
+      console.warn('Gemini embedQuery failed, using local vector fallback:', err);
+    }
+  }
+  return generateLocalVector(query);
+}
+
+/**
+ * Deterministic local term-frequency normalized vector for offline/demo search.
+ * Produces a 768-dimensional L2-normalized vector compatible with pgvector schema.
+ */
+export function generateLocalVector(text: string): number[] {
+  const dim = 768;
+  const vec = new Array(dim).fill(0);
+  const words = text.toLowerCase().match(/\w+/g) || [];
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    let hash = 0;
+    for (let j = 0; j < word.length; j++) {
+      hash = (hash * 31 + word.charCodeAt(j)) % dim;
+    }
+    vec[Math.abs(hash)] += 1;
+  }
+
+  const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0)) || 1;
+  return vec.map((v) => v / norm);
 }
 
 /**

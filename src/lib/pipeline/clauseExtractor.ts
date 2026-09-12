@@ -66,15 +66,155 @@ const VALID_FLAGS = new Set([
  * happens in Pass 3 using the section map built in Pass 1.
  */
 export async function extractClauses(fullText: string): Promise<RawClause[]> {
-  const textToAnalyze =
-    fullText.length > 900_000 ? fullText.slice(0, 900_000) + '\n\n[DOCUMENT TRUNCATED]' : fullText;
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  const prompt = buildClausePrompt(textToAnalyze);
-  const response = await geminiJSON<GeminiClauseResponse>(prompt);
+  if (apiKey) {
+    try {
+      const textToAnalyze =
+        fullText.length > 900_000 ? fullText.slice(0, 900_000) + '\n\n[DOCUMENT TRUNCATED]' : fullText;
 
-  const clauses = (response.clauses || [])
-    .map(normalizeClause)
-    .filter((c) => c.content.trim().length > 20); // Drop near-empty clauses
+      const prompt = buildClausePrompt(textToAnalyze);
+      const response = await geminiJSON<GeminiClauseResponse>(prompt);
+
+      if (response && Array.isArray(response.clauses) && response.clauses.length > 0) {
+        const clauses = response.clauses
+          .map(normalizeClause)
+          .filter((c) => c.content.trim().length > 20); // Drop near-empty clauses
+        return clauses;
+      }
+    } catch (err) {
+      console.warn('Gemini clause extraction failed or quota exceeded, using rule-based fallback:', err);
+    }
+  }
+
+  return ruleBasedClauseExtraction(fullText);
+}
+
+/**
+ * Rule-based clause extraction fallback for offline / mock demo mode.
+ * Deterministically scans contract text, segments clauses, and classifies legal patterns.
+ */
+export function ruleBasedClauseExtraction(fullText: string): RawClause[] {
+  const clauses: RawClause[] = [];
+  const paragraphs = fullText.split(/\n\s*\n/).filter((p) => p.trim().length > 40);
+
+  const headingRegex = /^(?:(?:SECTION|ARTICLE|CLAUSE)\s+([0-9A-Z.]+)|([0-9]{1,2}(?:\.[0-9]{1,2}){0,3})\.?)\s*(?:[:.–-]\s*|\s+)?([^\n]{3,80})?/i;
+  const refRegex = /(?:Section|Article|Clause|Exhibit|Schedule)\s+([0-9A-Z]+(?:\.[0-9]+)*(?:\([a-z0-9]+\))?)/gi;
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    const text = paragraphs[i].trim();
+    const firstLine = text.split('\n')[0] || '';
+    const match = firstLine.match(headingRegex);
+
+    const sectionNumber = match ? (match[1] || match[2] || null) : null;
+    const title = match && match[3] ? match[3].trim() : null;
+
+    // Detect clause type
+    let clauseType: ClauseType = 'other';
+    const lower = text.toLowerCase();
+
+    if (/auto[- ]?renew|successive.*term|renewal.*period/i.test(lower)) {
+      clauseType = 'auto_renewal';
+    } else if (/terminat|cancel/i.test(lower)) {
+      clauseType = 'termination';
+    } else if (/indemnif|hold harmless|defend.*against/i.test(lower)) {
+      clauseType = 'indemnification';
+    } else if (/limitation of liability|indirect.*damage|aggregate liability|liability cap/i.test(lower)) {
+      clauseType = 'liability';
+    } else if (/intellectual property|work product|work made for hire|proprietary rights/i.test(lower)) {
+      clauseType = 'ip_ownership';
+    } else if (/fee|pricing|invoic|payment|net \d+|billing/i.test(lower)) {
+      clauseType = 'payment';
+    } else if (/confidential|non-disclosure|proprietary information/i.test(lower)) {
+      clauseType = 'confidentiality';
+    } else if (/arbitrat|dispute resolution|jams|american arbitration/i.test(lower)) {
+      clauseType = 'dispute_resolution';
+    } else if (/governing law|jurisdiction|venue/i.test(lower)) {
+      clauseType = 'governing_law';
+    } else if (/non-compete|non-solicit|restrictive covenant/i.test(lower)) {
+      clauseType = 'non_compete';
+    } else if (/warrant|as is|merchantability/i.test(lower)) {
+      clauseType = 'warranties';
+    } else if (/data protection|privacy|personal data|gdpr|ccpa/i.test(lower)) {
+      clauseType = 'data_privacy';
+    }
+
+    // Skip generic boilerplate if not matched and too short
+    if (clauseType === 'other' && text.length < 100) {
+      continue;
+    }
+
+    // Detect flags
+    const flags: string[] = [];
+    if (clauseType === 'auto_renewal' || /automatically renew/i.test(lower)) {
+      flags.push('auto-renewal');
+    }
+    if (/without cause|sole discretion|immediate termination/i.test(lower)) {
+      flags.push('one-sided-termination');
+    }
+    if (/uncapped|unlimited liability|no limitation of liability/i.test(lower)) {
+      flags.push('uncapped-liability');
+    }
+    if (/broad indemnification|any and all claims|defend, indemnify/i.test(lower)) {
+      flags.push('broad-indemnification');
+    }
+    if (/assigns all right|work made for hire/i.test(lower)) {
+      flags.push('ip-assignment');
+    }
+    if (/non-compete|compete directly/i.test(lower)) {
+      flags.push('non-compete');
+    }
+    if (/arbitrat/i.test(lower)) {
+      flags.push('mandatory-arbitration');
+    }
+
+    // Determine risk level
+    let riskLevel: RiskLevel = 'low';
+    let riskRationale = 'Standard commercial clause with low contractual risk.';
+
+    if (flags.length > 0 || clauseType === 'auto_renewal' || clauseType === 'indemnification') {
+      riskLevel = 'high';
+      riskRationale = `High risk flagged: ${flags.join(', ') || 'broad liability/indemnity exposure'}.`;
+    } else if (['termination', 'liability', 'dispute_resolution', 'data_privacy'].includes(clauseType)) {
+      riskLevel = 'medium';
+      riskRationale = `Medium risk: requires review for notice periods, liability caps, and procedural rights.`;
+    }
+
+    // Extract raw references
+    const rawReferences: string[] = [];
+    let refMatch;
+    while ((refMatch = refRegex.exec(text)) !== null) {
+      const fullRef = refMatch[0].trim();
+      if (!rawReferences.includes(fullRef)) {
+        rawReferences.push(fullRef);
+      }
+    }
+
+    clauses.push({
+      section_number: sectionNumber,
+      title: title || (clauseType !== 'other' ? clauseType.replace(/_/g, ' ').toUpperCase() : null),
+      clause_type: clauseType,
+      content: text,
+      risk_level: riskLevel,
+      flags,
+      raw_references: rawReferences,
+    });
+  }
+
+  // Ensure we return at least the parsed paragraphs if none specifically triggered keywords
+  if (clauses.length === 0 && paragraphs.length > 0) {
+    paragraphs.slice(0, 8).forEach((p, idx) => {
+      clauses.push({
+        section_number: String(idx + 1),
+        title: `Clause ${idx + 1}`,
+        clause_type: 'other',
+        content: p.trim(),
+        risk_level: 'low',
+        flags: [],
+        raw_references: [],
+      });
+    });
+  }
 
   return clauses;
 }

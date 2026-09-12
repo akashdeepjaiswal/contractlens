@@ -48,37 +48,146 @@ interface GeminiStructureResponse {
  * so the reference resolver can look up any cross-reference.
  */
 export async function analyzeStructure(fullText: string): Promise<StructureAnalysis> {
-  // Truncate if extremely long to fit Gemini context
-  const textToAnalyze =
-    fullText.length > 900_000 ? fullText.slice(0, 900_000) + '\n\n[DOCUMENT TRUNCATED]' : fullText;
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  const prompt = buildStructurePrompt(textToAnalyze);
-  const response = await geminiJSON<GeminiStructureResponse>(prompt);
+  if (apiKey) {
+    try {
+      // Truncate if extremely long to fit Gemini context
+      const textToAnalyze =
+        fullText.length > 900_000 ? fullText.slice(0, 900_000) + '\n\n[DOCUMENT TRUNCATED]' : fullText;
 
-  // Validate and normalize
-  const sectionMap: SectionMapItem[] = (response.sections || []).map((s) => ({
-    section_number: String(s.section_number || '').trim(),
-    title: s.title ? String(s.title).trim() : null,
-    content: String(s.content || '').trim(),
-    depth: typeof s.depth === 'number' ? s.depth : inferDepth(String(s.section_number || '')),
-  }));
+      const prompt = buildStructurePrompt(textToAnalyze);
+      const response = await geminiJSON<GeminiStructureResponse>(prompt);
 
-  const definedTerms: DefinedTermItem[] = (response.defined_terms || []).map((t) => ({
-    term: String(t.term || '').trim(),
-    definition: String(t.definition || '').trim(),
-    section_ref: t.section_ref ? String(t.section_ref).trim() : null,
-  }));
+      if (response && Array.isArray(response.sections) && response.sections.length > 0) {
+        // Validate and normalize
+        const sectionMap: SectionMapItem[] = response.sections.map((s) => ({
+          section_number: String(s.section_number || '').trim(),
+          title: s.title ? String(s.title).trim() : null,
+          content: String(s.content || '').trim(),
+          depth: typeof s.depth === 'number' ? s.depth : inferDepth(String(s.section_number || '')),
+        }));
+
+        const definedTerms: DefinedTermItem[] = (response.defined_terms || []).map((t) => ({
+          term: String(t.term || '').trim(),
+          definition: String(t.definition || '').trim(),
+          section_ref: t.section_ref ? String(t.section_ref).trim() : null,
+        }));
+
+        const metadata: ContractMetadata = {
+          parties: Array.isArray(response.metadata?.parties) ? response.metadata.parties : [],
+          date: response.metadata?.date || undefined,
+          governing_law: response.metadata?.governing_law || undefined,
+          contract_type: response.metadata?.contract_type || undefined,
+          effective_date: response.metadata?.effective_date || undefined,
+          expiry_date: response.metadata?.expiry_date || undefined,
+        };
+
+        return { sectionMap, definedTerms, metadata };
+      }
+    } catch (err) {
+      console.warn('Gemini structure analysis failed or quota exceeded, using rule-based fallback:', err);
+    }
+  }
+
+  return ruleBasedStructureAnalysis(fullText);
+}
+
+/**
+ * Rule-based fallback for structure analysis when LLM API is unavailable.
+ * Deterministically parses sections, defined terms, and metadata from contract text.
+ */
+export function ruleBasedStructureAnalysis(fullText: string): StructureAnalysis {
+  const sections: SectionMapItem[] = [];
+  const definedTerms: DefinedTermItem[] = [];
+
+  // 1. Extract Defined Terms
+  const defRegex = /"([A-Z][A-Za-z0-9\s-]{2,40})"\s+(?:means|shall mean|refers to|has the meaning)\s+([^.\n]+(?:\.[^.\n]+)?)/gi;
+  let defMatch;
+  const seenTerms = new Set<string>();
+  while ((defMatch = defRegex.exec(fullText)) !== null) {
+    const term = defMatch[1].trim();
+    if (!seenTerms.has(term.toLowerCase())) {
+      seenTerms.add(term.toLowerCase());
+      definedTerms.push({
+        term,
+        definition: defMatch[2].trim(),
+        section_ref: null,
+      });
+    }
+  }
+
+  // 2. Extract Sections via heading patterns
+  const lines = fullText.split('\n');
+  let currentSection: { number: string; title: string | null; lines: string[] } | null = null;
+
+  const headingRegex = /^(?:(?:SECTION|ARTICLE|CLAUSE)\s+([0-9A-Z.]+)|([0-9]{1,2}(?:\.[0-9]{1,2}){0,3})\.?)\s*(?:[:.–-]\s*|\s+)?([^\n]{3,80})?$/i;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const match = line.match(headingRegex);
+
+    if (match) {
+      if (currentSection) {
+        sections.push({
+          section_number: currentSection.number,
+          title: currentSection.title,
+          content: currentSection.lines.join('\n').trim(),
+          depth: inferDepth(currentSection.number),
+        });
+      }
+      const secNum = (match[1] || match[2] || '1').trim();
+      const secTitle = match[3] ? match[3].trim() : null;
+      currentSection = { number: secNum, title: secTitle, lines: [line] };
+    } else if (currentSection) {
+      currentSection.lines.push(rawLine);
+    }
+  }
+
+  if (currentSection) {
+    sections.push({
+      section_number: currentSection.number,
+      title: currentSection.title,
+      content: currentSection.lines.join('\n').trim(),
+      depth: inferDepth(currentSection.number),
+    });
+  }
+
+  // If no structured headings were detected, create paragraph blocks
+  if (sections.length === 0) {
+    const paragraphs = fullText.split(/\n\s*\n/).filter((p) => p.trim().length > 30);
+    paragraphs.forEach((para, idx) => {
+      sections.push({
+        section_number: String(idx + 1),
+        title: para.slice(0, 40).replace(/[^a-zA-Z0-9\s]/g, '') + '...',
+        content: para.trim(),
+        depth: 0,
+      });
+    });
+  }
+
+  // 3. Extract Metadata
+  let governingLaw: string | undefined;
+  const govMatch = fullText.match(/governed by.*?laws of (?:the State of )?([A-Za-z\s]+?)(?:,|\.|\n|;)/i);
+  if (govMatch) governingLaw = govMatch[1].trim();
+
+  let parties: string[] = [];
+  const partyMatch = fullText.match(/between\s+([A-Z][A-Za-z0-9\s,.]+?)\s+and\s+([A-Z][A-Za-z0-9\s,.]+?)(?:,|\.|\n|dated)/i);
+  if (partyMatch) {
+    parties = [partyMatch[1].trim(), partyMatch[2].trim()];
+  }
+
+  const dateMatch = fullText.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}/i);
 
   const metadata: ContractMetadata = {
-    parties: Array.isArray(response.metadata?.parties) ? response.metadata.parties : [],
-    date: response.metadata?.date || undefined,
-    governing_law: response.metadata?.governing_law || undefined,
-    contract_type: response.metadata?.contract_type || undefined,
-    effective_date: response.metadata?.effective_date || undefined,
-    expiry_date: response.metadata?.expiry_date || undefined,
+    parties,
+    governing_law: governingLaw,
+    date: dateMatch ? dateMatch[0] : undefined,
+    contract_type: 'Commercial Contract',
+    effective_date: dateMatch ? dateMatch[0] : undefined,
   };
 
-  return { sectionMap, definedTerms, metadata };
+  return { sectionMap: sections, definedTerms, metadata };
 }
 
 // ============================================================

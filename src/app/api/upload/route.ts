@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/db/client';
+import { uploadContractFile } from '@/lib/db/storage';
 import { createContract } from '@/lib/db/contracts';
 
 export const runtime = 'nodejs';
@@ -31,17 +31,11 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Upload to Supabase Storage
-    const supabase = createServerClient();
+    // Save to storage (Supabase if configured, otherwise persistent local store)
     const fileName = `${Date.now()}-${file.name.replace(/[^a-z0-9.-]/gi, '_')}`;
     const filePath = `contracts/${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('contracts')
-      .upload(filePath, buffer, {
-        contentType: 'application/pdf',
-        upsert: false,
-      });
+    const { error: uploadError } = await uploadContractFile(filePath, buffer);
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
@@ -64,7 +58,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('Upload error:', err);
     return NextResponse.json(
-      { error: 'Upload failed. Please try again.' },
+      { error: err instanceof Error ? err.message : 'Upload failed. Please try again.' },
       { status: 500 }
     );
   }

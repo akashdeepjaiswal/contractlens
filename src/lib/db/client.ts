@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Check if Supabase environment variables are provided
+export function isSupabaseConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  );
+}
+
 // Server-side client (uses service role for full access)
 export function createServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

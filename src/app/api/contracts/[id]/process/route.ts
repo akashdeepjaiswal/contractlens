@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createServerClient } from '@/lib/db/client';
+import { downloadContractFile } from '@/lib/db/storage';
 import {
   getContract,
   updateContractStatus,
@@ -55,16 +55,12 @@ export async function POST(
         // ── Stage 1: Extract PDF ───────────────────────────────────────
         send({ stage: 'extracting', message: 'Extracting text from PDF…', progress: 5 });
 
-        const supabase = createServerClient();
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from('contracts')
-          .download(contract.file_path!);
+        const { data: buffer, error: downloadError } = await downloadContractFile(contract.file_path!);
 
-        if (downloadError || !fileData) {
-          throw new Error(`Failed to download PDF: ${downloadError?.message}`);
+        if (downloadError || !buffer) {
+          throw new Error(`Failed to download PDF: ${downloadError?.message || 'File not found'}`);
         }
 
-        const buffer = Buffer.from(await fileData.arrayBuffer());
         const extracted = await extractPDF(buffer);
 
         await updateContractStatus(id, 'processing', {
