@@ -10,7 +10,7 @@ function getClient(): GoogleGenerativeAI {
 }
 
 /**
- * Run a structured JSON prompt using Gemini 1.5 Flash.
+ * Run a structured JSON prompt using Gemini (defaults to gemini-2.0-flash / gemini-1.5-flash).
  * Returns parsed JSON or throws on failure.
  */
 export async function geminiJSON<T>(
@@ -18,38 +18,44 @@ export async function geminiJSON<T>(
   retries = 2
 ): Promise<T> {
   const client = getClient();
-  const model = client.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.1, // Low temp for consistent structured output
-    },
-  });
+  const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const modelsToTry = [preferredModel, 'gemini-1.5-flash'];
+  const uniqueModels = Array.from(new Set(modelsToTry));
 
   let lastError: Error | null = null;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
+  for (const modelName of uniqueModels) {
+    const model = client.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1, // Low temp for consistent structured output
+      },
+    });
 
-      // Strip markdown code fences if Gemini wraps JSON in them
-      const cleaned = text
-        .replace(/^```(?:json)?\n?/i, '')
-        .replace(/\n?```$/i, '')
-        .trim();
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
 
-      return JSON.parse(cleaned) as T;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < retries) {
-        // Exponential backoff: 1s, 2s
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        // Strip markdown code fences if Gemini wraps JSON in them
+        const cleaned = text
+          .replace(/^```(?:json)?\n?/i, '')
+          .replace(/\n?```$/i, '')
+          .trim();
+
+        return JSON.parse(cleaned) as T;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < retries) {
+          // Exponential backoff: 1s, 2s
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        }
       }
     }
   }
 
-  throw new Error(`Gemini JSON call failed after ${retries + 1} attempts: ${lastError?.message}`);
+  throw new Error(`Gemini JSON call failed: ${lastError?.message}`);
 }
 
 /**

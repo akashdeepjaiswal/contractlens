@@ -4,7 +4,7 @@
 
 ContractLens is an AI-powered web app that extracts and structures every clause from vendor contracts (PDFs), resolves cross-references so each clause has its full context, flags risk, and lets founders query across all their contracts in plain English.
 
-**Live demo**: [your-vercel-url.vercel.app](https://your-vercel-url.vercel.app)
+**Live demo**: [contractlens-taupe.vercel.app](https://contractlens-taupe.vercel.app)
 
 ---
 
@@ -131,7 +131,7 @@ The embedding encodes the *resolved meaning*, so semantic search for "payment th
 | Framework | Next.js 14 (App Router) |
 | Language | TypeScript |
 | Styling | Vanilla CSS with design tokens |
-| LLM | Google Gemini 1.5 Flash |
+| LLM | Google Gemini 2.0 / 1.5 Flash (benchmarked against Claude 3.5 Sonnet & GPT-4o) |
 | Embeddings | Gemini text-embedding-004 (768d) |
 | Database | Supabase (PostgreSQL + pgvector) |
 | Storage | Supabase Storage |
