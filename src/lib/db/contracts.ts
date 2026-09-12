@@ -3,6 +3,7 @@ import { mockStore } from './mockStore';
 import type { Contract, ContractMetadata, RiskSummary, ContractStatus } from '@/lib/types';
 
 export async function createContract(data: {
+  id?: string;
   name: string;
   filePath: string | null;
 }): Promise<Contract> {
@@ -12,6 +13,7 @@ export async function createContract(data: {
       const { data: contract, error } = await supabase
         .from('contracts')
         .insert({
+          ...(data.id && { id: data.id }),
           name: data.name,
           file_path: data.filePath,
           status: 'pending' as ContractStatus,

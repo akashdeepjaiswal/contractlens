@@ -248,9 +248,9 @@ export class MockStore {
   }
 
   // Contracts
-  async createContract(data: { name: string; filePath: string | null }): Promise<Contract> {
+  async createContract(data: { id?: string; name: string; filePath: string | null }): Promise<Contract> {
     const state = this.state;
-    const id = `contract-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const id = data.id || `contract-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const now = new Date().toISOString();
 
     const contract: Contract = {

@@ -75,6 +75,7 @@ export async function POST(
         if (!contract && requestPayload?.contract) {
           try {
             contract = await createContract({
+              id,
               name: requestPayload.contract.name,
               filePath: requestPayload.contract.file_path,
             });
