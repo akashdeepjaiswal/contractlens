@@ -26,15 +26,40 @@ export default function ContractDetailPage() {
   const loadContract = useCallback(async () => {
     try {
       const res = await fetch(`/api/contracts/${id}`);
-      if (!res.ok) throw new Error('Contract not found');
-      const data = await res.json();
-      setContract(data.contract);
-      setClauses(data.clauses || []);
-      setLoading(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load');
-      setLoading(false);
+      if (res.ok) {
+        const data = await res.json();
+        setContract(data.contract);
+        setClauses(data.clauses || []);
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // Fallback to local session cache
     }
+
+    // Try reading from client session storage
+    if (typeof window !== 'undefined') {
+      try {
+        const cachedRaw = sessionStorage.getItem(`contract_${id}`);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          const contractObj = cached.contract || cached;
+          setContract(contractObj);
+
+          const cachedClausesRaw = sessionStorage.getItem(`clauses_${id}`);
+          if (cachedClausesRaw) {
+            setClauses(JSON.parse(cachedClausesRaw));
+          }
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    setError('Contract not found');
+    setLoading(false);
   }, [id]);
 
   useEffect(() => {

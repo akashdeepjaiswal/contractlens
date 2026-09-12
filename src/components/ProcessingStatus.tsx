@@ -42,8 +42,22 @@ export default function ProcessingStatus({
     setStarted(true);
 
     try {
+      let clientPayload = null;
+      if (typeof window !== 'undefined') {
+        const cached = sessionStorage.getItem(`contract_${contractId}`);
+        if (cached) {
+          try {
+            clientPayload = JSON.parse(cached);
+          } catch {
+            // ignore
+          }
+        }
+      }
+
       const response = await fetch(`/api/contracts/${contractId}/process`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: clientPayload ? JSON.stringify(clientPayload) : undefined,
       });
 
       if (!response.body) throw new Error('No response body');
@@ -63,11 +77,27 @@ export default function ProcessingStatus({
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const event: ProcessingEvent = JSON.parse(line.slice(6));
+              const event: ProcessingEvent & {
+                contract?: unknown;
+                clauses?: unknown;
+                sectionMap?: unknown;
+                definedTerms?: unknown;
+              } = JSON.parse(line.slice(6));
+
               setCurrentEvent(event);
               setEvents((prev) => [...prev, event]);
 
               if (event.stage === 'done') {
+                if (typeof window !== 'undefined' && event.contract) {
+                  try {
+                    sessionStorage.setItem(`contract_${contractId}`, JSON.stringify(event.contract));
+                    if (event.clauses) {
+                      sessionStorage.setItem(`clauses_${contractId}`, JSON.stringify(event.clauses));
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }
                 setTimeout(onComplete, 1000);
               } else if (event.stage === 'error') {
                 onError(event.error || event.message);

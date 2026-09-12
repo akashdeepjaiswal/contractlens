@@ -44,6 +44,20 @@ export default function UploadZone() {
         throw new Error(data.error || 'Upload failed');
       }
 
+      if (typeof window !== 'undefined' && data.contract) {
+        try {
+          sessionStorage.setItem(
+            `contract_${data.contractId}`,
+            JSON.stringify({
+              contract: data.contract,
+              fileBase64: data.fileBase64,
+            })
+          );
+        } catch {
+          // ignore
+        }
+      }
+
       setState({ status: 'success', progress: 100, error: null, contractId: data.contractId });
 
       // Navigate to the contract page for processing

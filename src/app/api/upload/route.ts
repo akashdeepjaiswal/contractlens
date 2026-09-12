@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       contractId: contract.id,
       name: contract.name,
+      contract,
+      fileBase64: buffer.toString('base64'),
     });
   } catch (err) {
     console.error('Upload error:', err);

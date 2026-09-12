@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { downloadContractFile } from '@/lib/db/storage';
+import { downloadContractFile, uploadContractFile } from '@/lib/db/storage';
 import {
   getContract,
+  createContract,
   updateContractStatus,
   updateContractMetadata,
 } from '@/lib/db/contracts';
@@ -9,6 +10,9 @@ import {
   insertSectionMap,
   insertDefinedTerms,
   insertClauses,
+  getClausesByContract,
+  getSectionMap,
+  getDefinedTerms,
 } from '@/lib/db/clauses';
 import { extractPDF } from '@/lib/pipeline/extractor';
 import { analyzeStructure } from '@/lib/pipeline/structureAnalyzer';
@@ -21,32 +25,80 @@ export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 min for large contracts
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Optional payload recovery for serverless environments where containers don't share memory
+  let requestPayload: {
+    contract?: { id: string; name: string; file_path: string | null };
+    fileBase64?: string;
+  } | null = null;
+
+  try {
+    requestPayload = await request.json();
+  } catch {
+    // Body is optional
+  }
 
   // SSE setup
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      function send(event: ProcessingEvent) {
-        const data = `data: ${JSON.stringify(event)}\n\n`;
-        controller.enqueue(encoder.encode(data));
+      let isClosed = false;
+      function closeController() {
+        if (!isClosed) {
+          isClosed = true;
+          try {
+            controller.close();
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      function send(event: ProcessingEvent & Record<string, unknown>) {
+        if (isClosed) return;
+        try {
+          const data = `data: ${JSON.stringify(event)}\n\n`;
+          controller.enqueue(encoder.encode(data));
+        } catch {
+          // stream might be closed by client
+        }
       }
 
       try {
-        // Load contract
-        const contract = await getContract(id);
+        // Load contract from DB/store, or reconstruct from client payload if serverless container switched
+        let contract = await getContract(id);
+
+        if (!contract && requestPayload?.contract) {
+          try {
+            contract = await createContract({
+              name: requestPayload.contract.name,
+              filePath: requestPayload.contract.file_path,
+            });
+            // sync ID if possible
+            if (contract && requestPayload.fileBase64 && requestPayload.contract.file_path) {
+              await uploadContractFile(
+                requestPayload.contract.file_path,
+                Buffer.from(requestPayload.fileBase64, 'base64')
+              );
+            }
+          } catch (err) {
+            console.warn('Could not re-seed contract from payload:', err);
+          }
+        }
+
         if (!contract) {
           send({ stage: 'error', message: 'Contract not found', progress: 0, error: 'NOT_FOUND' });
-          controller.close();
+          closeController();
           return;
         }
 
         if (contract.status === 'processing') {
           send({ stage: 'error', message: 'Already processing', progress: 0 });
-          controller.close();
+          closeController();
           return;
         }
 
@@ -55,10 +107,20 @@ export async function POST(
         // ── Stage 1: Extract PDF ───────────────────────────────────────
         send({ stage: 'extracting', message: 'Extracting text from PDF…', progress: 5 });
 
-        const { data: buffer, error: downloadError } = await downloadContractFile(contract.file_path!);
+        let buffer: Buffer | null = null;
+        if (contract.file_path) {
+          const { data, error: downloadError } = await downloadContractFile(contract.file_path);
+          if (!downloadError && data) {
+            buffer = data;
+          }
+        }
 
-        if (downloadError || !buffer) {
-          throw new Error(`Failed to download PDF: ${downloadError?.message || 'File not found'}`);
+        if (!buffer && requestPayload?.fileBase64) {
+          buffer = Buffer.from(requestPayload.fileBase64, 'base64');
+        }
+
+        if (!buffer) {
+          throw new Error('Failed to retrieve PDF file for processing.');
         }
 
         const extracted = await extractPDF(buffer);
@@ -162,10 +224,19 @@ export async function POST(
           resolvedClauses.length
         );
 
+        const finalContract = await getContract(id);
+        const finalClauses = await getClausesByContract(id);
+        const finalSectionMap = await getSectionMap(id);
+        const finalDefinedTerms = await getDefinedTerms(id);
+
         send({
           stage: 'done',
           message: `Done! ${resolvedClauses.length} clauses extracted and indexed.`,
           progress: 100,
+          contract: finalContract,
+          clauses: finalClauses,
+          sectionMap: finalSectionMap,
+          definedTerms: finalDefinedTerms,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
@@ -173,7 +244,7 @@ export async function POST(
         await updateContractStatus(id, 'error', { errorMessage: message });
         send({ stage: 'error', message, progress: 0, error: message });
       } finally {
-        controller.close();
+        closeController();
       }
     },
   });
