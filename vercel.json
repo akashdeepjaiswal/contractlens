@@ -1,0 +1,18 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "functions": {
+    "src/app/api/contracts/[id]/process/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/query/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
