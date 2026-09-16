@@ -217,3 +217,14 @@
    - **Contract Detail Auto-Collapse (`.contract-detail-grid`)**: The desktop 2-column layout (`1fr 280px`) collapses to a single column on screens `<= 960px`, unsticking the metadata/risk sidebar so it neatly stacks below the clauses without squishing text.
    - **Adaptive Summary Stats Grid (`.summary-stats-grid`)**: Interactive metric cards wrap smoothly from 6 columns into a 2-column grid on mobile screens `<= 640px` with proper border division.
    - **Touch Target Accessibility**: All interactive elements (filter pills, buttons, tabs) implement `touch-action: manipulation; -webkit-tap-highlight-color: transparent;` and meet WCAG touch target guidelines.
+
+---
+
+### 14. Clause Cards Collapsed by Default with Granular & Global Expansion
+
+**Decision**: Reconfigured the bottom clause breakdown section to be **collapsed by default** across all states (initial load, risk filtering, and category selection), with click-to-expand interactivity and a global "Expand all / Collapse all" toggle control.
+
+**Why Collapsed by Default**:
+- **Information Density & Scannability**: Full-length legal clauses frequently span multiple lengthy paragraphs. When multiple clauses match a filter (e.g. 5-10 medium-risk provisions), expanding all cards automatically creates an overwhelming wall of text, pushing lower clauses out of view.
+- **Progressive Disclosure**: By keeping cards collapsed by default, users immediately see a clean, compact overview of every matched clause (type badge, risk level, title, detected flags, and filter reasoning).
+- **Interactive Control**: Users click individual cards to expand the exact clause they want to examine (revealing highlighted in-paragraph sentences and cross-references), or click the global **"Expand all / Collapse all"** toggle to inspect all clauses simultaneously.
