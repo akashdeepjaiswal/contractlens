@@ -270,6 +270,7 @@ interface ClauseCardProps {
   contractName?: string;
   showContract?: boolean;
   defaultExpanded?: boolean;
+  forceExpanded?: boolean | null;
   similarity?: number;
   /** If provided, matching terms in title/content/resolved_context are highlighted */
   highlight?: string;
@@ -283,6 +284,7 @@ export default function ClauseCard({
   contractName,
   showContract = false,
   defaultExpanded = false,
+  forceExpanded = null,
   similarity,
   highlight,
   activeRiskFilter = 'all',
@@ -300,14 +302,15 @@ export default function ClauseCard({
   const isFlagMatched = Boolean(activeFlagFilter && clause.flags.includes(activeFlagFilter));
   const isFilterActive = isRiskMatched || isTypeMatched || isFlagMatched;
 
-  // Auto-expand when matching an active filter so the highlighted lines are immediately visible
-  const [expanded, setExpanded] = useState(defaultExpanded || isFilterActive);
+  // Collapsed by default; user clicks to expand and read full clause
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false);
 
+  // Sync with global Expand All / Collapse All controls
   useEffect(() => {
-    if (isFilterActive) {
-      setExpanded(true);
+    if (forceExpanded !== null && forceExpanded !== undefined) {
+      setExpanded(forceExpanded);
     }
-  }, [isFilterActive]);
+  }, [forceExpanded]);
 
   return (
     <div
@@ -465,8 +468,8 @@ export default function ClauseCard({
             </div>
           )}
 
-          {/* Snippet preview with in-paragraph highlighting when collapsed */}
-          {!expanded && (highlight || isFilterActive) && clause.content && (
+          {/* Snippet preview only when text search is active */}
+          {!expanded && highlight && clause.content && (
             <p style={{
               marginTop: 'var(--space-2)',
               fontSize: '0.8125rem',

@@ -29,6 +29,7 @@ export default function ContractDetailPage() {
   const [showStructure, setShowStructure] = useState(false);
   const [showGlossary, setShowGlossary] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [allExpanded, setAllExpanded] = useState<boolean | null>(null);
 
   const loadContract = useCallback(async () => {
     try {
@@ -502,17 +503,50 @@ export default function ContractDetailPage() {
                   </div>
                 )
               ) : (
-                <div id="clauses-list" className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  {filteredClauses.map((clause) => (
-                    <ClauseCard
-                      key={clause.id}
-                      clause={clause}
-                      highlight={searchText || undefined}
-                      activeRiskFilter={riskFilter}
-                      activeTypeFilter={typeFilter}
-                      activeFlagFilter={flagFilter}
-                    />
-                  ))}
+                <div>
+                  {/* Expand / Collapse all toggle bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+                    <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                      Clauses ({filteredClauses.length})
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setAllExpanded(prev => (prev ? false : true))}
+                      style={{ fontSize: '0.75rem', gap: 5, padding: '3px 8px', color: 'var(--color-primary-light)' }}
+                      id="toggle-expand-all-clauses"
+                    >
+                      {allExpanded ? (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                          </svg>
+                          Collapse all
+                        </>
+                      ) : (
+                        <>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                          Expand all
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div id="clauses-list" className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    {filteredClauses.map((clause) => (
+                      <ClauseCard
+                        key={clause.id}
+                        clause={clause}
+                        highlight={searchText || undefined}
+                        activeRiskFilter={riskFilter}
+                        activeTypeFilter={typeFilter}
+                        activeFlagFilter={flagFilter}
+                        forceExpanded={allExpanded}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </>
