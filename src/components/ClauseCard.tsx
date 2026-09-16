@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Clause, ClauseType, RiskLevel } from '@/lib/types';
 import {
   CLAUSE_TYPE_LABELS,
@@ -34,33 +34,99 @@ const RISK_EMOJI: Record<string, string> = {
   low: '🟢',
 };
 
-// ============================================================
-// HighlightedText — highlights query terms inside a string
-// ============================================================
+// Trigger keywords per flag for in-paragraph highlighting
+const FLAG_TRIGGERS: Record<string, string[]> = {
+  'broad-indemnification': [
+    'indemnif', 'hold harmless', 'defend', 'liable for any and all', 'reasonable costs',
+    'reprocurement costs', 'losses', 'claims', 'liabilities', 'damages', 'defending',
+  ],
+  'uncapped-liability': [
+    'liable', 'liability', 'unlimited', 'no limitation', 'not be limited', 'consequential',
+    'reprocurement costs', 'reasonable costs', 'all damages', 'incurred by',
+  ],
+  'one-sided-termination': [
+    'may terminate', 'terminate this agreement', 'written notice', 'cure', 'breach',
+    'default', 'one hundred and twenty', '120 days', '10 days', 'advance written notice',
+    'sole discretion', 'at will', 'without cause',
+  ],
+  'auto-renewal': [
+    'renew', 'renewal', 'automatic', 'successive', 'extension', 'unless notice',
+    'prior notice', 'advance notice',
+  ],
+  'ip-assignment': [
+    'assign', 'assignment', 'exclusive property', 'ownership', 'work product',
+    'inventions', 'intellectual property', 'all rights', 'deliverables',
+  ],
+  'non-compete': [
+    'non-compete', 'compete', 'solicit', 'solicitation', 'restrict', 'customers',
+    'competitor', 'business relationship',
+  ],
+  'liquidated-damages': [
+    'liquidated damages', 'penalty', 'forfeit', 'pre-estimated', 'fine',
+  ],
+  'mandatory-arbitration': [
+    'arbitration', 'arbitrator', 'binding', 'dispute', 'waive jury', 'class action',
+  ],
+  'unilateral-amendment': [
+    'modify', 'amend', 'at any time', 'sole discretion', 'update terms', 'unilateral',
+  ],
+};
 
-/**
- * Splits `text` into segments, wrapping any case-insensitive match of a
- * query term with <mark class="query-highlight">. Handles multiple
- * space-separated terms in the query.
- */
+const RISK_TRIGGERS: Record<'high' | 'medium' | 'low', string[]> = {
+  high: [
+    'shall be liable', 'liable for any and all', 'reprocurement costs', 'reasonable costs',
+    'indemnif', 'hold harmless', 'defend', 'sole discretion', 'without limitation',
+    'one hundred and twenty', '120 days', '10 days', 'default', 'penalty', 'breach',
+    'forfeit', 'uncapped', 'unlimited', 'consequential damages', 'assignment for the benefit',
+  ],
+  medium: [
+    'written notice', 'advance notice', 'cure', 'thirty', '30 days', 'sixty', '60 days',
+    'invoicing', 'payment', 'milestone', 'reimbursement', 'reimbursed', 'default',
+    'expense', 'consultant', 'commission',
+  ],
+  low: [
+    'governing law', 'laws of', 'jurisdiction', 'state of', 'confidential', 'warranty',
+    'severability', 'entire agreement', 'counterparts',
+  ],
+};
+
+const TYPE_TRIGGERS: Record<ClauseType, string[]> = {
+  termination: ['terminate', 'termination', 'notice', 'cure', 'breach', 'default', 'advance written notice', 'survive', 'survival', 'expiration'],
+  payment: ['payment', 'invoice', 'invoices', 'compensation', 'reimbursed', 'fee', 'fees', 'cost', 'costs', 'billing', 'milestone', 'expenses'],
+  ip_ownership: ['intellectual property', 'ownership', 'license', 'copyright', 'patent', 'deliverables', 'work product', 'proprietary', 'inventions'],
+  liability: ['liability', 'liable', 'limitation of liability', 'damages', 'consequential', 'direct damages', 'cap', 'exceed'],
+  indemnification: ['indemnify', 'indemnification', 'defense', 'defend', 'hold harmless', 'claims', 'losses', 'liabilities'],
+  auto_renewal: ['renew', 'renewal', 'automatic', 'successive', 'extension', 'advance notice'],
+  confidentiality: ['confidential', 'confidentiality', 'non-disclosure', 'proprietary information', 'trade secret'],
+  dispute_resolution: ['dispute', 'arbitration', 'mediation', 'court', 'litigation', 'escalation'],
+  governing_law: ['governing law', 'laws of', 'jurisdiction', 'venue', 'state of'],
+  force_majeure: ['force majeure', 'acts of god', 'unforeseeable', 'beyond reasonable control'],
+  warranties: ['warrant', 'warranty', 'as is', 'representation', 'disclaimer'],
+  data_privacy: ['personal data', 'privacy', 'security', 'gdpr', 'processing'],
+  non_compete: ['non-compete', 'compete', 'solicitation', 'restrictive'],
+  assignment: ['assign', 'assignment', 'transfer', 'successor'],
+  other: ['general', 'notice', 'agreement', 'provisions'],
+};
+
+// ============================================================
+// HighlightedText — highlights search terms inside a string
+// ============================================================
 function HighlightedText({ text, highlight }: { text: string; highlight?: string }) {
   if (!highlight || !highlight.trim() || !text) {
     return <>{text}</>;
   }
 
-  // Build a regex from all non-trivial words in the query (length >= 2)
   const terms = highlight
     .trim()
     .split(/\s+/)
     .filter((t) => t.length >= 2)
-    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // escape regex specials
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
   if (terms.length === 0) return <>{text}</>;
 
   const pattern = new RegExp(`(${terms.join('|')})`, 'gi');
   const parts = text.split(pattern);
 
-  // Reset regex lastIndex after split
   return (
     <>
       {parts.map((part, i) =>
@@ -70,6 +136,130 @@ function HighlightedText({ text, highlight }: { text: string; highlight?: string
           <span key={i}>{part}</span>
         )
       )}
+    </>
+  );
+}
+
+// ============================================================
+// EnhancedClauseText — Highlights the specific lines/sentences
+// and terms that caused the clause to match the active filter
+// ============================================================
+function EnhancedClauseText({
+  text,
+  highlight,
+  activeRiskFilter,
+  activeTypeFilter,
+  activeFlagFilter,
+  clause,
+}: {
+  text: string;
+  highlight?: string;
+  activeRiskFilter?: 'all' | 'high' | 'medium' | 'low';
+  activeTypeFilter?: 'all' | ClauseType;
+  activeFlagFilter?: string | null;
+  clause: Clause;
+}) {
+  if (!text) return null;
+
+  // Determine active theme and keywords
+  let filterTheme: 'risk-high' | 'risk-medium' | 'risk-low' | 'clause-type' | 'clause-flag' | null = null;
+  const triggerTerms: string[] = [];
+
+  if (activeFlagFilter && clause.flags.includes(activeFlagFilter)) {
+    filterTheme = 'clause-flag';
+    triggerTerms.push(...(FLAG_TRIGGERS[activeFlagFilter] || [activeFlagFilter]));
+  } else if (activeRiskFilter && activeRiskFilter !== 'all' && clause.risk_level === activeRiskFilter) {
+    filterTheme = `risk-${activeRiskFilter}` as any;
+    triggerTerms.push(...(RISK_TRIGGERS[activeRiskFilter] || []));
+    for (const f of clause.flags) {
+      if (FLAG_TRIGGERS[f]) triggerTerms.push(...FLAG_TRIGGERS[f]);
+    }
+  } else if (activeTypeFilter && activeTypeFilter !== 'all' && clause.clause_type === activeTypeFilter) {
+    filterTheme = 'clause-type';
+    triggerTerms.push(...(TYPE_TRIGGERS[activeTypeFilter] || [activeTypeFilter]));
+  }
+
+  // Also include search query terms if present
+  if (highlight && highlight.trim()) {
+    triggerTerms.push(
+      ...highlight
+        .trim()
+        .split(/\s+/)
+        .filter((t) => t.length >= 2)
+    );
+  }
+
+  // If no filters or query are active, return default text
+  if (triggerTerms.length === 0) {
+    return <HighlightedText text={text} highlight={highlight} />;
+  }
+
+  // Helper to highlight words inside a sentence
+  const highlightWords = (str: string) => {
+    const escaped = triggerTerms
+      .filter(Boolean)
+      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .sort((a, b) => b.length - a.length);
+
+    if (escaped.length === 0) return str;
+    const wordPattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+    const segments = str.split(wordPattern);
+
+    return segments.map((seg, idx) => {
+      if (seg.match(wordPattern)) {
+        return (
+          <mark
+            key={idx}
+            className={filterTheme ? `reason-word-match ${filterTheme}` : 'query-highlight'}
+          >
+            {seg}
+          </mark>
+        );
+      }
+      return seg;
+    });
+  };
+
+  // Split text by newlines to preserve structure
+  const lines = text.split(/(\r?\n+)/);
+
+  return (
+    <>
+      {lines.map((line, lineIdx) => {
+        if (/^\r?\n+$/.test(line)) {
+          return line;
+        }
+
+        // Split line into sentences
+        const sentenceSegments = line.split(/(?<=[.?!;])\s+/);
+
+        return (
+          <span key={lineIdx}>
+            {sentenceSegments.map((sentence, sIdx) => {
+              const matchesTrigger = triggerTerms.some((term) =>
+                sentence.toLowerCase().includes(term.toLowerCase())
+              );
+
+              if (matchesTrigger && filterTheme) {
+                return (
+                  <span
+                    key={sIdx}
+                    className={`reason-sentence-match ${filterTheme}`}
+                  >
+                    {highlightWords(sentence)}{' '}
+                  </span>
+                );
+              }
+
+              return (
+                <span key={sIdx}>
+                  {highlightWords(sentence)}{' '}
+                </span>
+              );
+            })}
+          </span>
+        );
+      })}
     </>
   );
 }
@@ -99,9 +289,7 @@ export default function ClauseCard({
   activeTypeFilter = 'all',
   activeFlagFilter = null,
 }: ClauseCardProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
   const [showResolved, setShowResolved] = useState(false);
-
   const typeColor = CLAUSE_TYPE_COLORS[clause.clause_type] || '#64748b';
   const hasResolvedRefs = (clause.raw_references?.length ?? 0) > 0;
   const hasUnresolved = (clause.unresolved_references?.length ?? 0) > 0;
@@ -110,6 +298,16 @@ export default function ClauseCard({
   const isRiskMatched = activeRiskFilter !== 'all' && clause.risk_level === activeRiskFilter;
   const isTypeMatched = activeTypeFilter !== 'all' && clause.clause_type === activeTypeFilter;
   const isFlagMatched = Boolean(activeFlagFilter && clause.flags.includes(activeFlagFilter));
+  const isFilterActive = isRiskMatched || isTypeMatched || isFlagMatched;
+
+  // Auto-expand when matching an active filter so the highlighted lines are immediately visible
+  const [expanded, setExpanded] = useState(defaultExpanded || isFilterActive);
+
+  useEffect(() => {
+    if (isFilterActive) {
+      setExpanded(true);
+    }
+  }, [isFilterActive]);
 
   return (
     <div
@@ -267,21 +465,25 @@ export default function ClauseCard({
             </div>
           )}
 
-          {/* Snippet preview with highlighting when collapsed and query is active */}
-          {!expanded && highlight && clause.content && (
+          {/* Snippet preview with in-paragraph highlighting when collapsed */}
+          {!expanded && (highlight || isFilterActive) && clause.content && (
             <p style={{
               marginTop: 'var(--space-2)',
               fontSize: '0.8125rem',
               color: 'var(--color-text-secondary)',
-              lineHeight: 1.55,
+              lineHeight: 1.6,
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: 2,
+              WebkitLineClamp: 3,
               overflow: 'hidden',
             }}>
-              <HighlightedText
-                text={clause.content.slice(0, 320)}
+              <EnhancedClauseText
+                text={clause.content.slice(0, 380)}
                 highlight={highlight}
+                activeRiskFilter={activeRiskFilter}
+                activeTypeFilter={activeTypeFilter}
+                activeFlagFilter={activeFlagFilter}
+                clause={clause}
               />
             </p>
           )}
@@ -310,6 +512,23 @@ export default function ClauseCard({
       {/* Expanded content */}
       {expanded && (
         <div className="animate-fade-in" style={{ marginTop: 'var(--space-4)' }}>
+          {/* Helpful note explaining highlighted lines */}
+          {isFilterActive && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              marginBottom: 'var(--space-2)',
+              fontSize: '0.75rem',
+              color: 'var(--color-text-secondary)',
+            }}>
+              <span style={{ fontSize: '0.875rem' }}>🎯</span>
+              <span>
+                <strong>Highlighted in paragraph:</strong> The specific lines and phrases that caused this clause to match the active filter.
+              </span>
+            </div>
+          )}
+
           <div
             style={{
               padding: 'var(--space-4)',
@@ -323,7 +542,14 @@ export default function ClauseCard({
               color: 'var(--color-text-primary)',
             }}
           >
-            <HighlightedText text={clause.content} highlight={highlight} />
+            <EnhancedClauseText
+              text={clause.content}
+              highlight={highlight}
+              activeRiskFilter={activeRiskFilter}
+              activeTypeFilter={activeTypeFilter}
+              activeFlagFilter={activeFlagFilter}
+              clause={clause}
+            />
           </div>
 
           {/* Cross-reference section */}
@@ -364,9 +590,13 @@ export default function ClauseCard({
                     Referenced Sections (resolved)
                   </p>
                   <div style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-secondary)' }}>
-                    <HighlightedText
+                    <EnhancedClauseText
                       text={clause.resolved_context.split('--- Referenced Sections ---')[1]?.split('--- Unresolved References ---')[0] || ''}
                       highlight={highlight}
+                      activeRiskFilter={activeRiskFilter}
+                      activeTypeFilter={activeTypeFilter}
+                      activeFlagFilter={activeFlagFilter}
+                      clause={clause}
                     />
                   </div>
 
