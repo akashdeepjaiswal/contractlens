@@ -158,7 +158,7 @@ export default function ContractDetailPage() {
         <span style={{ color: 'var(--color-text-primary)' }}>{contract.name}</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 'var(--space-8)', alignItems: 'start' }}>
+      <div className="contract-detail-grid">
         {/* Main column */}
         <div>
           {/* Contract header */}
@@ -521,7 +521,7 @@ export default function ContractDetailPage() {
 
         {/* Sidebar: metadata & risk summary */}
         {isReady && (
-          <div style={{ position: 'sticky', top: 'calc(var(--topbar-height) + var(--space-8))', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="contract-detail-sidebar">
             {/* Risk Summary (interactive) */}
             <div className="card-elevated" style={{ padding: 'var(--space-5)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>

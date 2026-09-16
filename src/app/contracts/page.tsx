@@ -69,8 +69,7 @@ export default function ContractsPage() {
       ) : (
         <div
           id="contracts-grid"
-          className="stagger"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 'var(--space-4)' }}
+          className="stagger contracts-responsive-grid"
         >
           {contracts.map((contract) => (
             <ContractCard key={contract.id} contract={contract} />

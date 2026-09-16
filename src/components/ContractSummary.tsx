@@ -150,11 +150,12 @@ export default function ContractSummary({
       </div>
 
       {/* Interactive Stats Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-        borderBottom: total > 0 ? '1px solid var(--color-border)' : undefined,
-      }}>
+      <div
+        className="summary-stats-grid"
+        style={{
+          borderBottom: total > 0 ? '1px solid var(--color-border)' : undefined,
+        }}
+      >
         {/* Total Clauses card */}
         <div
           onClick={() => {

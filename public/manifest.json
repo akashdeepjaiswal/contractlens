@@ -1,0 +1,54 @@
+{
+  "name": "ContractLens — Contract Review for Non-Lawyers",
+  "short_name": "ContractLens",
+  "description": "Upload vendor contracts and instantly extract, understand, and query every clause.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#4f46e5",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Upload Contract",
+      "short_name": "Upload",
+      "description": "Upload a new vendor contract for review",
+      "url": "/",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Contracts List",
+      "short_name": "Contracts",
+      "description": "View all uploaded contracts",
+      "url": "/contracts",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Search Clauses",
+      "short_name": "Search",
+      "description": "Semantic clause search across contracts",
+      "url": "/query",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

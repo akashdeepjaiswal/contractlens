@@ -195,3 +195,25 @@
 - Rather than a React-only `useEffect` state switch (which causes a visible dark-to-light flash on load), an inline `<script>` runs synchronously in `<head>` before the DOM renders. It sets `document.documentElement.setAttribute('data-theme', savedTheme || 'light')`.
 - All design tokens (`--color-bg`, `--color-surface`, `--color-text-*`, `--color-border`, `--shadow-*`, `--highlight-*`) adapt instantaneously without re-rendering component trees or shipping third-party theming libraries.
 
+---
+
+### 13. Mobile-First Responsiveness & Progressive Web App (PWA) Architecture
+
+**Decision**: Transformed ContractLens into an installable, mobile-optimized Progressive Web Application (PWA) supporting offline shell caching, standalone window presentation, and an ergonomic mobile UX architecture.
+
+**Key Technical Components**:
+1. **PWA Manifest & Next.js App Router Integration**:
+   - `public/manifest.json` and `src/app/manifest.ts` define app name, orientation, standalone display mode, background/theme colors, navigation shortcuts, and multi-size high-res icons (192x192, 512x512, apple-touch-icon, and vector SVG).
+   - `export const viewport: Viewport` in `src/app/layout.tsx` sets `viewportFit: 'cover'`, `themeColor`, and scaling limits for notch/pill safe areas on modern mobile devices (iOS Safari and Android Chrome).
+
+2. **Offline-Capable Service Worker (`/sw.js`)**:
+   - Pre-caches core app shell routes (`/`, `/contracts`, `/query`, icons, and manifest).
+   - Implements **Stale-While-Revalidate** caching for HTML pages and static assets to ensure near-instant load times on high-latency mobile connections.
+   - Implements **Network-First** caching for API endpoints (`/api/*`), gracefully falling back to cached responses when offline.
+   - Listens for `beforeinstallprompt` via `<PWARegistration />` to provide a non-intrusive one-click install banner on supported devices.
+
+3. **Mobile Navigation & Adaptive Layout Hierarchy**:
+   - **Bottom Navigation Bar (`.mobile-bottom-nav`)**: Since the desktop sidebar is hidden on small screens (`<= 768px`), mobile users receive an ergonomically placed bottom navigation bar with 48px+ touch targets and active state indicators for Upload, Contracts, and Search.
+   - **Contract Detail Auto-Collapse (`.contract-detail-grid`)**: The desktop 2-column layout (`1fr 280px`) collapses to a single column on screens `<= 960px`, unsticking the metadata/risk sidebar so it neatly stacks below the clauses without squishing text.
+   - **Adaptive Summary Stats Grid (`.summary-stats-grid`)**: Interactive metric cards wrap smoothly from 6 columns into a 2-column grid on mobile screens `<= 640px` with proper border division.
+   - **Touch Target Accessibility**: All interactive elements (filter pills, buttons, tabs) implement `touch-action: manipulation; -webkit-tap-highlight-color: transparent;` and meet WCAG touch target guidelines.

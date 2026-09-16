@@ -47,14 +47,7 @@ export default function HomePage() {
       <UploadZone />
 
       {/* Features */}
-      <div
-        style={{
-          marginTop: 'var(--space-12)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 'var(--space-4)',
-        }}
-      >
+      <div className="responsive-features-grid">
         {[
           {
             icon: '🔍',

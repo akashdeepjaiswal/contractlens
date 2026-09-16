@@ -771,11 +771,19 @@ h4 { font-size: 0.9375rem; font-weight: 600; line-height: 1.4; }
 @media (max-width: 768px) {
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: var(--topbar-height) 1fr;
+    grid-template-rows: auto 1fr;
   }
   .sidebar { display: none; }
-  .main-content { padding: var(--space-4); }
-  h1 { font-size: 1.75rem; }
+  .topbar {
+    padding: 0 var(--space-4);
+    height: 56px;
+  }
+  .main-content {
+    padding: var(--space-4);
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 16px));
+    overflow-x: hidden;
+  }
+  h1 { font-size: 1.5rem; }
 }
 
 /* ============================================================
@@ -948,6 +956,8 @@ mark.query-highlight {
   cursor: pointer;
   transition: all var(--transition-fast);
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .clickable-pill:hover {
   transform: translateY(-1px);
@@ -1069,3 +1079,264 @@ mark.query-highlight {
   border-bottom: 1.5px solid var(--reason-word-type-border);
   box-shadow: 0 0 8px var(--color-primary-glow);
 }
+
+/* ============================================================
+   MOBILE BOTTOM NAVIGATION (PWA / Mobile UX)
+   ============================================================ */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--color-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--color-border);
+    z-index: 1000;
+    align-items: center;
+    justify-content: space-around;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 100%;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-nav-item:active {
+    opacity: 0.7;
+  }
+
+  .mobile-nav-item.active {
+    color: var(--color-primary-light);
+  }
+
+  .mobile-nav-item.active .mobile-nav-icon {
+    transform: translateY(-1px) scale(1.1);
+    color: var(--color-primary-light);
+  }
+
+  .mobile-nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease;
+  }
+
+  .mobile-nav-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-nav-label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  .mobile-nav-item.active .mobile-nav-label {
+    font-weight: 600;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE GRIDS (Detail, Stats, Features, Contracts)
+   ============================================================ */
+.contract-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.contract-detail-sidebar {
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--space-8));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 960px) {
+  .contract-detail-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .contract-detail-sidebar {
+    position: static;
+  }
+}
+
+.summary-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+@media (max-width: 640px) {
+  .summary-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-stats-grid .stat-filter-card {
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+  }
+
+  .summary-stats-grid .stat-filter-card:nth-child(2n) {
+    border-right: none;
+  }
+
+  .summary-stats-grid .stat-filter-card:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+}
+
+.responsive-features-grid {
+  margin-top: var(--space-12);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .responsive-features-grid {
+    grid-template-columns: 1fr;
+    margin-top: var(--space-8);
+    gap: var(--space-3);
+  }
+}
+
+.contracts-responsive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-4);
+}
+
+/* ============================================================
+   PWA INSTALL BANNER
+   ============================================================ */
+.pwa-install-banner {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom, 12px));
+  left: 16px;
+  right: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  z-index: 1100;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--color-border);
+  padding: 12px 16px;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 769px) {
+  .pwa-install-banner {
+    bottom: 24px;
+    right: 24px;
+    left: auto;
+    width: 380px;
+  }
+}
+
+.pwa-install-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pwa-install-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+
+.pwa-install-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-install-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.pwa-install-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-install-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pwa-btn-install {
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+}
+
+.pwa-btn-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  font-size: 0.875rem;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pwa-btn-dismiss:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

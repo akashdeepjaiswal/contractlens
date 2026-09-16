@@ -175,6 +175,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main className="main-content">
         {children}
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
+        {navItems.map((item) => {
+          const isActive = item.href === '/'
+            ? pathname === '/'
+            : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+            >
+              <div className="mobile-nav-icon">{item.icon}</div>
+              <span className="mobile-nav-label">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
