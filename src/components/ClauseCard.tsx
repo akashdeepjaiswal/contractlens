@@ -173,9 +173,9 @@ export default function ClauseCard({
                     fontSize: '0.6875rem',
                     padding: '1px 6px',
                     borderRadius: 4,
-                    background: 'rgba(239, 68, 68, 0.08)',
-                    color: '#fca5a5',
-                    border: '1px solid rgba(239, 68, 68, 0.15)',
+                    background: 'var(--color-risk-high-bg)',
+                    color: 'var(--color-risk-high)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
                     fontWeight: 500,
                   }}
                 >

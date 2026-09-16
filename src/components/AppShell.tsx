@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -41,6 +42,30 @@ const navItems: NavItem[] = [
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    // Read active theme set by head script or localStorage
+    const current = document.documentElement.getAttribute('data-theme') as 'light' | 'dark' | null;
+    if (current === 'light' || current === 'dark') {
+      setTheme(current);
+    } else {
+      const saved = (localStorage.getItem('cl-theme') as 'light' | 'dark' | null) || 'light';
+      setTheme(saved);
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    try {
+      localStorage.setItem('cl-theme', nextTheme);
+    } catch {
+      // Ignore localStorage unavailable
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -57,15 +82,52 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           }}>
             CL
           </div>
-          <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.02em' }}>
+          <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.02em', color: 'var(--color-text-primary)' }}>
             ContractLens
           </span>
         </Link>
 
         <div style={{ flex: 1 }} />
 
+        {/* Theme Toggle */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="btn btn-ghost btn-sm"
+          title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          aria-label="Toggle light/dark theme"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 10px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-surface-2)',
+            cursor: 'pointer',
+          }}
+        >
+          {theme === 'light' ? (
+            <>
+              {/* Moon icon for switching to dark */}
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+              <span className="text-xs" style={{ fontWeight: 600 }}>Dark</span>
+            </>
+          ) : (
+            <>
+              {/* Sun icon for switching to light */}
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <span className="text-xs" style={{ fontWeight: 600 }}>Light</span>
+            </>
+          )}
+        </button>
+
         <a
-          href="https://github.com/yourusername/contractlens"
+          href="https://github.com/akashdeepjaiswal/contractlens"
           target="_blank"
           rel="noopener noreferrer"
           className="btn btn-ghost btn-sm"

@@ -15,7 +15,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="light" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var t = localStorage.getItem('cl-theme');
+                if (t === 'dark' || t === 'light') {
+                  document.documentElement.setAttribute('data-theme', t);
+                } else {
+                  document.documentElement.setAttribute('data-theme', 'light');
+                }
+              } catch(e) {}
+            `,
+          }}
+        />
+      </head>
       <body>
         <AppShell>{children}</AppShell>
       </body>

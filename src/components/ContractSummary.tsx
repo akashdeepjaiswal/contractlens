@@ -204,9 +204,9 @@ export default function ContractSummary({
                     fontSize: '0.75rem',
                     padding: '2px 8px',
                     borderRadius: 4,
-                    background: 'rgba(239,68,68,0.08)',
-                    color: '#fca5a5',
-                    border: '1px solid rgba(239,68,68,0.15)',
+                    background: 'var(--color-risk-high-bg)',
+                    color: 'var(--color-risk-high)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
                     fontWeight: 500,
                   }}>
                     ⚠ {flag}

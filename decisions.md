@@ -179,3 +179,19 @@
 - Replace pdf-parse with a pure-JS PDF library: not worth the quality tradeoff for a 5-day build
 
 **Why it matters**: Without this fix, every contract uploaded to the Vercel/Turbopack deployment extracted 29 characters of fallback text instead of the full document. The 3-pass pipeline would then run on effectively empty content. This was the most critical production bug and is worth documenting because it's a non-obvious interaction between a bundler and a native module.
+
+---
+
+### 12. Theme Architecture — Light as Default with Dark Toggle
+
+**Decision**: Implemented dual light/dark theme support with **light theme as the default**, powered entirely by CSS Custom Properties (`:root, [data-theme="light"]` and `[data-theme="dark"]`), persisted in `localStorage`, and initialized before first paint via an inline `<head>` script to prevent theme flashing (FOUC).
+
+**Why Light as default**:
+- **Legibility for long-form legal text**: Contract review involves dense legal paragraphs. Contrast studies demonstrate higher reading speeds and comprehension in positive polarity (dark text on light backgrounds) for dense analytical reading.
+- **Enterprise & SaaS alignment**: Standard contract and procurement tools (Ironclad, DocuSign, Carta) default to light mode for executive review during daylight business hours.
+- **Dark mode option**: Users who review contracts late or prefer low eye-strain environments can switch with a single click in the topbar.
+
+**Zero-FOUC Implementation**:
+- Rather than a React-only `useEffect` state switch (which causes a visible dark-to-light flash on load), an inline `<script>` runs synchronously in `<head>` before the DOM renders. It sets `document.documentElement.setAttribute('data-theme', savedTheme || 'light')`.
+- All design tokens (`--color-bg`, `--color-surface`, `--color-text-*`, `--color-border`, `--shadow-*`, `--highlight-*`) adapt instantaneously without re-rendering component trees or shipping third-party theming libraries.
+
