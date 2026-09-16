@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import ClauseCard from '@/components/ClauseCard';
+import ContractSummary from '@/components/ContractSummary';
 import Link from 'next/link';
 import type { Contract, Clause, ClauseType, SectionMapEntry, DefinedTerm } from '@/lib/types';
 import { CLAUSE_TYPE_LABELS } from '@/lib/types';
@@ -198,6 +199,16 @@ export default function ContractDetailPage() {
             </div>
           )}
 
+          {/* Contract Summary — shown as soon as ready, before clauses */}
+          {isReady && (
+            <ContractSummary
+              contract={contract}
+              clauses={clauses}
+              sectionMap={sectionMap}
+              definedTerms={definedTerms}
+            />
+          )}
+
           {isError && (
             <div style={{
               marginBottom: 'var(--space-6)',
@@ -285,10 +296,48 @@ export default function ContractDetailPage() {
 
               {/* Clause list */}
               {filteredClauses.length === 0 ? (
-                <div className="empty-state" style={{ padding: 'var(--space-12)' }}>
-                  <div className="empty-state-icon">🔍</div>
-                  <p>No clauses match your filters</p>
-                </div>
+                clauses.length === 0 ? (
+                  // 0 clauses extracted — smart diagnostic
+                  <div style={{
+                    padding: 'var(--space-8)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-xl)',
+                    textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: 40, marginBottom: 'var(--space-4)' }}>🔬</div>
+                    <h3 style={{ fontWeight: 600, marginBottom: 'var(--space-2)' }}>No clauses were extracted</h3>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9375rem', maxWidth: 480, margin: '0 auto var(--space-5)' }}>
+                      This can happen when:
+                    </p>
+                    <ul style={{ textAlign: 'left', display: 'inline-block', color: 'var(--color-text-secondary)', fontSize: '0.875rem', lineHeight: 2, marginBottom: 'var(--space-6)' }}>
+                      <li>📷 <strong>Image-based PDF</strong> — the document is scanned and has no selectable text</li>
+                      <li>📄 <strong>Too short</strong> — only {contract.page_count || 1} page(s); Gemini needs structured legal text to classify</li>
+                      <li>🌍 <strong>Non-English</strong> — extraction is tuned for English-language contracts</li>
+                      <li>🔒 <strong>Password-protected</strong> — encrypted PDFs can't be read</li>
+                    </ul>
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleRetry}
+                        disabled={retrying}
+                        id="retry-processing-btn-empty"
+                      >
+                        {retrying ? 'Retrying…' : '↺ Retry Analysis'}
+                      </button>
+                      <Link href="/" className="btn btn-secondary">
+                        Upload a Different PDF
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  // Filters are too narrow
+                  <div className="empty-state" style={{ padding: 'var(--space-12)' }}>
+                    <div className="empty-state-icon">🔍</div>
+                    <p>No clauses match your filters</p>
+                    <p className="text-sm text-muted" style={{ marginTop: 4 }}>Try adjusting the risk level or clause type filters</p>
+                  </div>
+                )
               ) : (
                 <div id="clauses-list" className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   {filteredClauses.map((clause) => (

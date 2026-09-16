@@ -5,12 +5,20 @@ import type { ProcessingEvent, ProcessingStage } from '@/lib/types';
 
 const STAGE_LABELS: Record<ProcessingStage, string> = {
   extracting: 'Extracting text',
-  analyzing_structure: 'Building section map',
+  analyzing_structure: 'Mapping document structure',
   extracting_clauses: 'Classifying clauses',
   resolving_references: 'Resolving cross-references',
-  generating_embeddings: 'Generating embeddings',
+  generating_embeddings: 'Indexing for search',
   done: 'Complete',
   error: 'Error',
+};
+
+const STAGE_DESC: Partial<Record<ProcessingStage, string>> = {
+  extracting: 'Reading the PDF and pulling out raw text',
+  analyzing_structure: 'Building a section map and extracting defined terms',
+  extracting_clauses: 'Identifying clause types, risk levels, and flags',
+  resolving_references: 'Inlining cross-references so each clause is self-contained',
+  generating_embeddings: 'Creating semantic vectors for natural-language search',
 };
 
 const STAGE_ORDER: ProcessingStage[] = [
@@ -233,13 +241,20 @@ export default function ProcessingStatus({
                 )}
               </div>
 
-              <span style={{
-                fontSize: '0.8125rem',
-                color: isCompleted ? 'var(--color-text-secondary)' : isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                fontWeight: isCurrent ? 500 : 400,
-              }}>
-                {STAGE_LABELS[s]}
-              </span>
+              <div>
+                <span style={{
+                  fontSize: '0.8125rem',
+                  color: isCompleted ? 'var(--color-text-secondary)' : isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                  fontWeight: isCurrent ? 500 : 400,
+                }}>
+                  {STAGE_LABELS[s]}
+                </span>
+                {isCurrent && STAGE_DESC[s] && (
+                  <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 1 }}>
+                    {STAGE_DESC[s]}
+                  </p>
+                )}
+              </div>
             </div>
           );
         })}
