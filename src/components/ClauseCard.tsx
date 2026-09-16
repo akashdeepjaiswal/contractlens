@@ -29,12 +29,54 @@ const RISK_EMOJI: Record<string, string> = {
   low: '🟢',
 };
 
+// ============================================================
+// HighlightedText — highlights query terms inside a string
+// ============================================================
+
+/**
+ * Splits `text` into segments, wrapping any case-insensitive match of a
+ * query term with <mark class="query-highlight">. Handles multiple
+ * space-separated terms in the query.
+ */
+function HighlightedText({ text, highlight }: { text: string; highlight?: string }) {
+  if (!highlight || !highlight.trim() || !text) {
+    return <>{text}</>;
+  }
+
+  // Build a regex from all non-trivial words in the query (length >= 2)
+  const terms = highlight
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t.length >= 2)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // escape regex specials
+
+  if (terms.length === 0) return <>{text}</>;
+
+  const pattern = new RegExp(`(${terms.join('|')})`, 'gi');
+  const parts = text.split(pattern);
+
+  // Reset regex lastIndex after split
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.match(pattern) ? (
+          <mark key={i} className="query-highlight">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 interface ClauseCardProps {
   clause: Clause;
   contractName?: string;
   showContract?: boolean;
   defaultExpanded?: boolean;
   similarity?: number;
+  /** If provided, matching terms in title/content/resolved_context are highlighted */
+  highlight?: string;
 }
 
 export default function ClauseCard({
@@ -43,6 +85,7 @@ export default function ClauseCard({
   showContract = false,
   defaultExpanded = false,
   similarity,
+  highlight,
 }: ClauseCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [showResolved, setShowResolved] = useState(false);
@@ -112,9 +155,12 @@ export default function ClauseCard({
             )}
           </div>
 
-          {/* Title */}
+          {/* Title — highlighted */}
           <h4 style={{ fontWeight: 600, marginBottom: 'var(--space-1)', lineHeight: 1.3 }}>
-            {clause.title || CLAUSE_TYPE_LABELS[clause.clause_type]}
+            <HighlightedText
+              text={clause.title || CLAUSE_TYPE_LABELS[clause.clause_type]}
+              highlight={highlight}
+            />
           </h4>
 
           {/* Flags */}
@@ -137,6 +183,25 @@ export default function ClauseCard({
                 </span>
               ))}
             </div>
+          )}
+
+          {/* Snippet preview with highlighting when collapsed and query is active */}
+          {!expanded && highlight && clause.content && (
+            <p style={{
+              marginTop: 'var(--space-2)',
+              fontSize: '0.8125rem',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 1.55,
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2,
+              overflow: 'hidden',
+            }}>
+              <HighlightedText
+                text={clause.content.slice(0, 320)}
+                highlight={highlight}
+              />
+            </p>
           )}
         </div>
 
@@ -176,7 +241,7 @@ export default function ClauseCard({
               color: 'var(--color-text-primary)',
             }}
           >
-            {clause.content}
+            <HighlightedText text={clause.content} highlight={highlight} />
           </div>
 
           {/* Cross-reference section */}
@@ -216,9 +281,11 @@ export default function ClauseCard({
                   <p style={{ color: 'var(--color-primary-light)', fontWeight: 600, marginBottom: 'var(--space-3)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Referenced Sections (resolved)
                   </p>
-                  {/* Render the "--- Referenced Sections ---" part of resolved_context */}
                   <div style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-secondary)' }}>
-                    {clause.resolved_context.split('--- Referenced Sections ---')[1]?.split('--- Unresolved References ---')[0] || ''}
+                    <HighlightedText
+                      text={clause.resolved_context.split('--- Referenced Sections ---')[1]?.split('--- Unresolved References ---')[0] || ''}
+                      highlight={highlight}
+                    />
                   </div>
 
                   {hasUnresolved && (

@@ -291,6 +291,7 @@ export default function QueryPage() {
                   contractName={contractMap.get(result.clause.contract_id)?.name || result.contract.name}
                   showContract={true}
                   similarity={result.similarity}
+                  highlight={results.query}
                 />
               ))}
             </div>

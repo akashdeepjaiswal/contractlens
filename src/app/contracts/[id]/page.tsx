@@ -292,7 +292,7 @@ export default function ContractDetailPage() {
               ) : (
                 <div id="clauses-list" className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   {filteredClauses.map((clause) => (
-                    <ClauseCard key={clause.id} clause={clause} />
+                    <ClauseCard key={clause.id} clause={clause} highlight={searchText || undefined} />
                   ))}
                 </div>
               )}

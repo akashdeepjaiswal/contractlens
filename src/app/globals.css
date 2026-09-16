@@ -673,3 +673,18 @@ h4 { font-size: 0.9375rem; font-weight: 600; line-height: 1.4; }
   .main-content { padding: var(--space-4); }
   h1 { font-size: 1.75rem; }
 }
+
+/* ============================================================
+   QUERY HIGHLIGHT
+   ============================================================ */
+mark.query-highlight {
+  background: rgba(245, 158, 11, 0.28);
+  color: #fde68a;
+  border-radius: 3px;
+  padding: 0 2px;
+  border-bottom: 1.5px solid rgba(245, 158, 11, 0.6);
+  font-style: inherit;
+  font-weight: 600;
+  /* Slight glow so it pops on dark background */
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.15);
+}
