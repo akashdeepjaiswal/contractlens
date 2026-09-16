@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['pdf-parse'],
   // Increase the body parser limit for large PDF uploads
   experimental: {
     serverActions: {
