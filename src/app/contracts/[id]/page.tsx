@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import ProcessingStatus from '@/components/ProcessingStatus';
 import ClauseCard from '@/components/ClauseCard';
 import Link from 'next/link';
-import type { Contract, Clause, ClauseType } from '@/lib/types';
+import type { Contract, Clause, ClauseType, SectionMapEntry, DefinedTerm } from '@/lib/types';
 import { CLAUSE_TYPE_LABELS } from '@/lib/types';
 
 type FilterType = 'all' | ClauseType;
@@ -17,11 +17,16 @@ export default function ContractDetailPage() {
 
   const [contract, setContract] = useState<Contract | null>(null);
   const [clauses, setClauses] = useState<Clause[]>([]);
+  const [sectionMap, setSectionMap] = useState<SectionMapEntry[]>([]);
+  const [definedTerms, setDefinedTerms] = useState<DefinedTerm[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
   const [searchText, setSearchText] = useState('');
+  const [showStructure, setShowStructure] = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const loadContract = useCallback(async () => {
     try {
@@ -30,6 +35,8 @@ export default function ContractDetailPage() {
         const data = await res.json();
         setContract(data.contract);
         setClauses(data.clauses || []);
+        setSectionMap(data.sectionMap || []);
+        setDefinedTerms(data.definedTerms || []);
         setLoading(false);
         return;
       }
@@ -61,6 +68,23 @@ export default function ContractDetailPage() {
     setError('Contract not found');
     setLoading(false);
   }, [id]);
+
+  const handleRetry = useCallback(async () => {
+    if (!contract) return;
+    setRetrying(true);
+    try {
+      // Reset error status so ProcessingStatus component auto-starts
+      const res = await fetch(`/api/contracts/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        // Force status back to pending so the ProcessingStatus panel re-mounts
+        setContract({ ...data.contract, status: 'pending' });
+      }
+    } catch {
+      // ignore — UI will still show retry button
+    }
+    setRetrying(false);
+  }, [contract, id]);
 
   useEffect(() => {
     loadContract();
@@ -105,10 +129,12 @@ export default function ContractDetailPage() {
     return (
       <div className="empty-state">
         <div className="empty-state-icon">⚠️</div>
-        <p style={{ color: 'var(--color-risk-high)' }}>{error}</p>
-        <Link href="/contracts" className="btn btn-secondary" style={{ marginTop: 'var(--space-2)' }}>
-          Back to Contracts
-        </Link>
+        <p style={{ color: 'var(--color-risk-high)', marginBottom: 'var(--space-3)' }}>{error}</p>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Link href="/contracts" className="btn btn-secondary">
+            Back to Contracts
+          </Link>
+        </div>
       </div>
     );
   }
@@ -182,7 +208,16 @@ export default function ContractDetailPage() {
               color: 'var(--color-risk-high)',
             }}>
               <p style={{ fontWeight: 600, marginBottom: 4 }}>Processing failed</p>
-              <p className="text-sm">{contract.error_message || 'An unknown error occurred'}</p>
+              <p className="text-sm" style={{ marginBottom: 'var(--space-3)' }}>{contract.error_message || 'An unknown error occurred'}</p>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleRetry}
+                disabled={retrying}
+                id="retry-processing-btn"
+                style={{ marginTop: 4 }}
+              >
+                {retrying ? 'Retrying…' : '↺ Retry Processing'}
+              </button>
             </div>
           )}
 
@@ -344,6 +379,111 @@ export default function ContractDetailPage() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Defined Terms Glossary */}
+            {definedTerms.length > 0 && (
+              <div className="card-elevated" style={{ padding: 'var(--space-5)' }}>
+                <button
+                  onClick={() => setShowGlossary(g => !g)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    marginBottom: showGlossary ? 'var(--space-4)' : 0,
+                  }}
+                  id="toggle-glossary-btn"
+                  aria-expanded={showGlossary}
+                >
+                  <h4 style={{ color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    📖 Defined Terms
+                  </h4>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="tag" style={{ fontSize: '0.6875rem' }}>{definedTerms.length}</span>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                      style={{ color: 'var(--color-text-muted)', transform: showGlossary ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </button>
+                {showGlossary && (
+                  <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                    {definedTerms.map(dt => (
+                      <div key={dt.id} style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-3)' }}>
+                        <p style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--color-primary-light)', marginBottom: 4 }}>
+                          {dt.term}
+                          {dt.section_ref && (
+                            <span className="tag" style={{ marginLeft: 6, fontSize: '0.6875rem', fontWeight: 400 }}>§ {dt.section_ref}</span>
+                          )}
+                        </p>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{dt.definition}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Document Structure */}
+            {sectionMap.length > 0 && (
+              <div className="card-elevated" style={{ padding: 'var(--space-5)' }}>
+                <button
+                  onClick={() => setShowStructure(s => !s)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    marginBottom: showStructure ? 'var(--space-4)' : 0,
+                  }}
+                  id="toggle-structure-btn"
+                  aria-expanded={showStructure}
+                >
+                  <h4 style={{ color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    🗂 Document Structure
+                  </h4>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span className="tag" style={{ fontSize: '0.6875rem' }}>{sectionMap.length} sections</span>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                      style={{ color: 'var(--color-text-muted)', transform: showStructure ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </span>
+                </button>
+                {showStructure && (
+                  <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {sectionMap.slice(0, 30).map(section => (
+                      <div
+                        key={section.id}
+                        style={{
+                          paddingLeft: `${section.depth * 12}px`,
+                          paddingTop: 4,
+                          paddingBottom: 4,
+                          borderLeft: section.depth > 0 ? '1px solid var(--color-border)' : 'none',
+                          marginLeft: section.depth > 0 ? 6 : 0,
+                        }}
+                      >
+                        <p style={{ fontSize: '0.75rem', color: section.depth === 0 ? 'var(--color-text-primary)' : 'var(--color-text-secondary)', fontWeight: section.depth === 0 ? 600 : 400 }}>
+                          <span style={{ color: 'var(--color-text-muted)', marginRight: 6 }}>{section.section_number}</span>
+                          {section.title || '—'}
+                        </p>
+                      </div>
+                    ))}
+                    {sectionMap.length > 30 && (
+                      <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>+ {sectionMap.length - 30} more sections</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

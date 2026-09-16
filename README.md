@@ -28,7 +28,7 @@ ContractLens is an AI-powered web app that extracts and structures every clause 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/yourusername/contractlens.git
+git clone https://github.com/akashdeepjaiswal/contractlens.git
 cd contractlens
 npm install
 ```
@@ -131,7 +131,7 @@ The embedding encodes the *resolved meaning*, so semantic search for "payment th
 | Framework | Next.js 14 (App Router) |
 | Language | TypeScript |
 | Styling | Vanilla CSS with design tokens |
-| LLM | Google Gemini 2.0 / 1.5 Flash (benchmarked against Claude 3.5 Sonnet & GPT-4o) |
+| LLM | Google Gemini 2.5 Flash (latest, benchmarked against Claude Sonnet 4.x & GPT-4o) |
 | Embeddings | Gemini text-embedding-004 (768d) |
 | Database | Supabase (PostgreSQL + pgvector) |
 | Storage | Supabase Storage |

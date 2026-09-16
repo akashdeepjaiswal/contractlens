@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getContract } from '@/lib/db/contracts';
-import { getClausesByContract } from '@/lib/db/clauses';
+import { getClausesByContract, getSectionMap, getDefinedTerms } from '@/lib/db/clauses';
 
 export const runtime = 'nodejs';
 
@@ -16,9 +16,13 @@ export async function GET(
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
     }
 
-    const clauses = await getClausesByContract(id);
+    const [clauses, sectionMap, definedTerms] = await Promise.all([
+      getClausesByContract(id),
+      getSectionMap(id),
+      getDefinedTerms(id),
+    ]);
 
-    return NextResponse.json({ contract, clauses });
+    return NextResponse.json({ contract, clauses, sectionMap, definedTerms });
   } catch (err) {
     console.error('Get contract error:', err);
     return NextResponse.json({ error: 'Failed to load contract' }, { status: 500 });

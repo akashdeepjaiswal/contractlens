@@ -30,29 +30,31 @@
 
 ---
 
-### 2. Model Selection: Gemini Flash vs. Claude 3.5 Sonnet vs. GPT-4o
+### 2. Model Selection: Gemini 2.5 Flash vs. Claude Sonnet 4.x vs. GPT-4o
 
-**Decision**: Gemini 2.0 / 1.5 Flash as the primary extraction and structuring engine, benchmarked against frontier alternatives (Claude 3.5 Sonnet and GPT-4o).
+**Decision**: Gemini 2.5 Flash as the primary extraction and structuring engine, with gemini-2.0-flash as automatic fallback, benchmarked against frontier alternatives (Claude Sonnet 4.x and GPT-4o).
 
 **Alternatives considered**:
-- **Claude 3.5 Sonnet**: The recognized gold standard for nuanced legal reasoning, edge-case clause categorization, and deep instruction adherence.
-  - *Why not as primary for this pipeline*: While Claude 3.5 Sonnet delivers unmatched comprehension on subtle legal clauses, its 200k context limit still requires defensive chunking for large contract packets (MSAs + multiple statements of work + exhibit schedules). More critically, in a multi-pass pipeline (structure analysis → clause extraction → risk tagging), Claude 3.5 Sonnet's 15–30s generation latency per pass pushes total processing time over 60–90 seconds, causing UX lag and risking serverless timeout thresholds on platforms like Vercel. Cost ($3.00 / $15.00 per MTok) and tighter tier rate limits also hinder high-volume contract ingestion.
-- **GPT-4o**: OpenAI's flagship model with strong multimodal comprehension and structured JSON output.
-  - *Why not as primary*: The 128k context window is restrictive for full-length enterprise agreements, forcing document fragmentation that undermines Pass 1 (where the global section map and defined-term registry must be built across the *entire* document without chunk boundaries). Slower token generation speeds compared to Flash models also degrade streaming responsiveness.
-- **Gemini 1.5 / 2.0 Pro**: Superior legal synthesis to Flash with the same 1M–2M context window, but 3–4x higher latency and higher cost per contract without a commensurate quality increase for standard clause segmentation and tagging.
+- **Claude Sonnet 4.x (Anthropic)**: Best-in-class for nuanced legal reasoning and multi-step instruction adherence. Recognized gold standard for legal document comprehension.
+  - *Why not chosen as primary*: Claude's API requires a paid Anthropic account and the free-tier limits made reliable demo operation impossible. More critically, in a 3-pass pipeline Claude's 15–30s generation latency per pass pushes total processing time over 90+ seconds — past Vercel's function timeout threshold on hobby tier. Cost ($3.00–$15.00 per MTok) makes demo-scale operation expensive. Claude would be the right choice for a production enterprise deployment where quality takes priority over latency/cost, and is explicitly documented as the recommendation for high-risk clause routing in a hybrid architecture.
+  - *Key tradeoff accepted*: Gemini Flash produces slightly more generic risk summaries on subtle legal edge-cases (e.g., IP carve-outs in indemnification clauses) compared to Claude. This is mitigated with strict few-shot prompting and rigid clause taxonomies.
+- **GPT-4o**: Strong multimodal comprehension and structured JSON output.
+  - *Why not chosen*: 128k context window is insufficient for full enterprise contracts (MSAs + exhibits + schedules) without chunking. Chunking breaks Pass 1 (global section map and defined-term registry must be built from the full document, not fragments). Slower token generation degrades SSE streaming responsiveness.
+- **Gemini 1.5 / 2.0 Pro**: Better legal synthesis than Flash but 3–4x higher latency and cost without meaningful quality improvement for standard clause segmentation.
+- **Gemini 2.0 Flash**: Previous generation Flash model. Kept as automatic fallback in the model cascade.
 
-**Reasoning**:
-1. **Unfragmented 1M–2M Token Context**: The cross-reference resolution problem demands seeing the whole document at once. A termination clause in Section 14 referencing definitions in Section 1 and liability caps in Exhibit B cannot be accurately structured if chunked arbitrarily. Gemini's massive window ingests entire 100+ page contracts in a single prompt.
-2. **Sub-second TTFT & Pipeline Throughput**: Multi-pass processing requires fast turnaround. Gemini Flash completes structure mapping in ~4–8s and clause extraction in ~10–15s, allowing our SSE stream to deliver real-time feedback and complete full ingestion in <25s.
-3. **Native JSON Schema Enforcement**: `responseMimeType: 'application/json'` guarantees schema compliance without brittle markdown stripping or regex fallbacks.
-4. **Cost-to-Performance Ratio**: At a fraction of the cost of frontier reasoning models, high-volume ingestion remains economically viable.
+**Why Gemini 2.5 Flash**:
+1. **1M–2M Token Context Window**: The cross-reference resolution problem demands seeing the whole document at once. A termination clause referencing definitions 40 pages earlier cannot be reliably structured from a chunked fragment. Gemini is the only model at this price point with a context window large enough for multi-hundred-page contracts.
+2. **Improved Reasoning over 2.0 Flash**: Gemini 2.5 Flash adds significantly better multi-step instruction following, more accurate structured JSON schema compliance, and better clause classification on ambiguous legal text (e.g., distinguishing liability limitation from indemnification when both appear in the same section).
+3. **Fast TTFT for SSE Streaming**: Structure mapping completes in ~4–8s, clause extraction in ~10–15s, allowing the SSE stream to deliver real-time feedback under Vercel's 300s max duration.
+4. **Native JSON Schema Enforcement**: `responseMimeType: 'application/json'` guarantees schema compliance without brittle post-processing.
+5. **Cost-to-Performance Ratio**: Fraction of Claude/GPT-4o cost, keeping high-volume ingestion economically viable.
 
 **Production Recommendation (Hybrid Architecture)**:
-In an enterprise production deployment, the ideal architecture is a **hybrid cascade**:
-- **Pass 1 & 2 (High-throughput ingestion & structure)**: Gemini Flash handles whole-document ingestion, section mapping, and initial clause extraction at low cost and sub-second latency.
-- **Pass 3 (High-risk legal synthesis)**: Ambiguous, high-risk, or high-liability clauses (e.g., indemnification carve-outs, IP assignment, non-solicitation) are conditionally routed to **Claude 3.5 Sonnet** for deep legal nuance and negotiation guidance.
+- **Pass 1 & 2 (structure + bulk clause extraction)**: Gemini 2.5 Flash — whole-document ingestion at low cost and low latency.
+- **Pass 3 (high-risk legal synthesis)**: Ambiguous, high-risk clauses (IP assignment, uncapped indemnification, non-solicitation) conditionally routed to Claude Sonnet for deep legal nuance and negotiation guidance.
 
-**Tradeoff accepted**: Gemini Flash can produce slightly more generic risk summaries on obscure legal edge cases compared to Claude 3.5 Sonnet. We mitigate this through rigid few-shot system prompts, strict clause categorization taxonomies, and deterministic local code for reference resolution.
+**Tradeoff accepted**: Gemini 2.5 Flash can produce slightly less nuanced risk rationale on edge-case legal clauses compared to Claude Sonnet. Mitigated by rigid few-shot prompts, strict clause taxonomies, and deterministic code for reference resolution.
 
 ---
 
@@ -160,3 +162,20 @@ In an enterprise production deployment, the ideal architecture is a **hybrid cas
 | Export (PDF report, CSV) | Nice-to-have, not core |
 | Suggested edits / negotiation tips | Would require a fine-tuned model or complex prompting; out of scope for 5 days |
 | Deployment CI/CD | Out of scope for a demo |
+
+---
+
+### 11. pdf-parse Turbopack bundling — serverExternalPackages fix
+
+**Decision**: Added `serverExternalPackages: ['pdf-parse']` to `next.config.ts`.
+
+**Problem discovered**: pdf-parse v2 uses dynamic `require()` expressions internally to load its PDF.js worker. Turbopack (Next.js 16's bundler) cannot statically analyze dynamic `require` calls and throws `Setting up fake worker failed: "Cannot find module as expression is too dynamic"`. This silently swallowed the v2 path and fell all the way back to the regex fallback, producing `Commercial Agreement Document` instead of the actual contract text.
+
+**Fix**: `serverExternalPackages` instructs Turbopack to leave `pdf-parse` unbundled and let Node.js resolve it natively at runtime. This is the correct solution — pdf-parse is a Node-only CJS module with platform-native dependencies and was never intended to be bundled.
+
+**Alternatives considered**:
+- Webpack config override to `externalize` pdf-parse: works but couples config to Webpack, not forward-compatible with Turbopack
+- Downgrade to Next.js 14 with Webpack: avoided; Turbopack is faster and is the future
+- Replace pdf-parse with a pure-JS PDF library: not worth the quality tradeoff for a 5-day build
+
+**Why it matters**: Without this fix, every contract uploaded to the Vercel/Turbopack deployment extracted 29 characters of fallback text instead of the full document. The 3-pass pipeline would then run on effectively empty content. This was the most critical production bug and is worth documenting because it's a non-obvious interaction between a bundler and a native module.

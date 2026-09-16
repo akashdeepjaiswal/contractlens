@@ -10,7 +10,8 @@ function getClient(): GoogleGenerativeAI {
 }
 
 /**
- * Run a structured JSON prompt using Gemini (defaults to gemini-2.0-flash / gemini-1.5-flash).
+ * Run a structured JSON prompt using Gemini.
+ * Defaults to gemini-2.5-flash (latest) with gemini-2.0-flash as fallback.
  * Returns parsed JSON or throws on failure.
  */
 export async function geminiJSON<T>(
@@ -18,8 +19,11 @@ export async function geminiJSON<T>(
   retries = 2
 ): Promise<T> {
   const client = getClient();
-  const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-  const modelsToTry = [preferredModel, 'gemini-1.5-flash'];
+  // gemini-2.5-flash: latest model with significantly better reasoning,
+  // multi-step instruction following, and structured JSON accuracy over 2.0-flash.
+  // Falls back to 2.0-flash if the 2.5 endpoint is unavailable.
+  const preferredModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelsToTry = [preferredModel, 'gemini-2.0-flash', 'gemini-1.5-flash'];
   const uniqueModels = Array.from(new Set(modelsToTry));
 
   let lastError: Error | null = null;
