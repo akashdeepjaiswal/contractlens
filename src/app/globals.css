@@ -791,3 +791,170 @@ mark.query-highlight {
   font-weight: 600;
   box-shadow: 0 0 8px var(--highlight-glow);
 }
+
+/* ============================================================
+   STAT FILTER CARDS (Interactive Summary Blocks)
+   ============================================================ */
+.stat-filter-card {
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--color-border);
+  text-align: center;
+  cursor: pointer;
+  background: transparent;
+  transition: all var(--transition-base);
+  position: relative;
+  user-select: none;
+  border-top: 3px solid transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.stat-filter-card:last-child {
+  border-right: none;
+}
+
+.stat-filter-card:hover {
+  background: var(--color-surface-2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-filter-card:active {
+  transform: translateY(0);
+}
+
+/* Specific Card Themes in Light & Dark */
+.stat-filter-card.stat-total {
+  border-top-color: var(--color-primary);
+}
+.stat-filter-card.stat-total:hover,
+.stat-filter-card.stat-total.active {
+  background: rgba(99, 102, 241, 0.08);
+}
+.stat-filter-card.stat-total.active {
+  box-shadow: inset 0 -2px 0 var(--color-primary), 0 0 16px var(--color-primary-glow);
+}
+
+.stat-filter-card.stat-high {
+  border-top-color: var(--color-risk-high);
+}
+.stat-filter-card.stat-high:hover,
+.stat-filter-card.stat-high.active {
+  background: var(--color-risk-high-bg);
+}
+.stat-filter-card.stat-high.active {
+  box-shadow: inset 0 -2px 0 var(--color-risk-high), 0 0 16px rgba(239, 68, 68, 0.25);
+}
+
+.stat-filter-card.stat-medium {
+  border-top-color: var(--color-risk-medium);
+}
+.stat-filter-card.stat-medium:hover,
+.stat-filter-card.stat-medium.active {
+  background: var(--color-risk-medium-bg);
+}
+.stat-filter-card.stat-medium.active {
+  box-shadow: inset 0 -2px 0 var(--color-risk-medium), 0 0 16px rgba(245, 158, 11, 0.25);
+}
+
+.stat-filter-card.stat-low {
+  border-top-color: var(--color-risk-low);
+}
+.stat-filter-card.stat-low:hover,
+.stat-filter-card.stat-low.active {
+  background: var(--color-risk-low-bg);
+}
+.stat-filter-card.stat-low.active {
+  box-shadow: inset 0 -2px 0 var(--color-risk-low), 0 0 16px rgba(34, 197, 94, 0.25);
+}
+
+.stat-filter-card.stat-terms {
+  border-top-color: #8b5cf6;
+}
+.stat-filter-card.stat-terms:hover,
+.stat-filter-card.stat-terms.active {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.stat-filter-card.stat-sections {
+  border-top-color: var(--color-text-secondary);
+}
+.stat-filter-card.stat-sections:hover,
+.stat-filter-card.stat-sections.active {
+  background: var(--color-surface-2);
+}
+
+.stat-active-badge {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  margin-top: 4px;
+}
+
+/* ============================================================
+   FILTER REASON HIGHLIGHT BANNER IN CLAUSE CARD
+   ============================================================ */
+.clause-reason-banner {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  border: 1px solid transparent;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+.clause-reason-banner.risk-high {
+  background: var(--color-risk-high-bg);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--color-text-primary);
+}
+
+.clause-reason-banner.risk-medium {
+  background: var(--color-risk-medium-bg);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--color-text-primary);
+}
+
+.clause-reason-banner.risk-low {
+  background: var(--color-risk-low-bg);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: var(--color-text-primary);
+}
+
+.clause-reason-banner.clause-type {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: var(--color-text-primary);
+}
+
+.clause-reason-banner.clause-flag {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--color-text-primary);
+}
+
+/* Interactive Pill Badges */
+.clickable-pill {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+.clickable-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+  box-shadow: var(--shadow-sm);
+}
+.clickable-pill.active {
+  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-sm);
+  font-weight: 700;
+}

@@ -24,6 +24,7 @@ export default function ContractDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
+  const [flagFilter, setFlagFilter] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [showStructure, setShowStructure] = useState(false);
   const [showGlossary, setShowGlossary] = useState(false);
@@ -104,6 +105,7 @@ export default function ContractDetailPage() {
   const filteredClauses = clauses.filter((c) => {
     if (typeFilter !== 'all' && c.clause_type !== typeFilter) return false;
     if (riskFilter !== 'all' && c.risk_level !== riskFilter) return false;
+    if (flagFilter && !c.flags.includes(flagFilter)) return false;
     if (searchText) {
       const lower = searchText.toLowerCase();
       if (
@@ -199,13 +201,31 @@ export default function ContractDetailPage() {
             </div>
           )}
 
-          {/* Contract Summary — shown as soon as ready, before clauses */}
+          {/* Contract Summary — interactive stat blocks & breakdown filters */}
           {isReady && (
             <ContractSummary
               contract={contract}
               clauses={clauses}
               sectionMap={sectionMap}
               definedTerms={definedTerms}
+              activeRiskFilter={riskFilter}
+              onSelectRiskFilter={(risk) => setRiskFilter(risk)}
+              activeTypeFilter={typeFilter}
+              onSelectTypeFilter={(type) => setTypeFilter(type)}
+              activeFlagFilter={flagFilter}
+              onSelectFlagFilter={(flag) => setFlagFilter(flag)}
+              onToggleGlossary={() => {
+                setShowGlossary(true);
+                setTimeout(() => {
+                  document.getElementById('toggle-glossary-btn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 50);
+              }}
+              onToggleStructure={() => {
+                setShowStructure(true);
+                setTimeout(() => {
+                  document.getElementById('toggle-structure-btn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 50);
+              }}
             />
           )}
 
@@ -292,6 +312,137 @@ export default function ContractDetailPage() {
                     );
                   })}
                 </div>
+                {/* Active Filter Bar */}
+                {(riskFilter !== 'all' || typeFilter !== 'all' || flagFilter || searchText) && (
+                  <div
+                    style={{
+                      marginBottom: 'var(--space-4)',
+                      padding: 'var(--space-3) var(--space-4)',
+                      background: 'var(--color-surface-2)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 'var(--space-2)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                        Filtered by:
+                      </span>
+
+                      {riskFilter !== 'all' && (
+                        <span
+                          className="badge"
+                          style={{
+                            background: `var(--color-risk-${riskFilter}-bg)`,
+                            color: `var(--color-risk-${riskFilter})`,
+                            border: `1px solid var(--color-risk-${riskFilter})`,
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                          }}
+                        >
+                          {riskFilter.toUpperCase()} RISK
+                          <button
+                            type="button"
+                            onClick={() => setRiskFilter('all')}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4, color: 'inherit', fontWeight: 700 }}
+                            title="Clear risk filter"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )}
+
+                      {typeFilter !== 'all' && (
+                        <span
+                          className="badge"
+                          style={{
+                            background: 'rgba(99, 102, 241, 0.12)',
+                            color: 'var(--color-primary-light)',
+                            border: '1px solid var(--color-primary)',
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                          }}
+                        >
+                          {CLAUSE_TYPE_LABELS[typeFilter]}
+                          <button
+                            type="button"
+                            onClick={() => setTypeFilter('all')}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4, color: 'inherit', fontWeight: 700 }}
+                            title="Clear clause type filter"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )}
+
+                      {flagFilter && (
+                        <span
+                          className="badge"
+                          style={{
+                            background: 'var(--color-risk-high-bg)',
+                            color: 'var(--color-risk-high)',
+                            border: '1px solid var(--color-risk-high)',
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                          }}
+                        >
+                          ⚠ {flagFilter}
+                          <button
+                            type="button"
+                            onClick={() => setFlagFilter(null)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4, color: 'inherit', fontWeight: 700 }}
+                            title="Clear flag filter"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )}
+
+                      {searchText && (
+                        <span
+                          className="badge"
+                          style={{
+                            background: 'var(--color-surface-3)',
+                            color: 'var(--color-text-primary)',
+                            padding: '3px 8px',
+                          }}
+                        >
+                          Search: "{searchText}"
+                          <button
+                            type="button"
+                            onClick={() => setSearchText('')}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 4, color: 'inherit', fontWeight: 700 }}
+                            title="Clear search"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )}
+
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                        ({filteredClauses.length} of {clauses.length} clauses matched)
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: '0.75rem', padding: '2px 8px' }}
+                      onClick={() => {
+                        setRiskFilter('all');
+                        setTypeFilter('all');
+                        setFlagFilter(null);
+                        setSearchText('');
+                      }}
+                    >
+                      Reset all filters
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Clause list */}
@@ -336,12 +487,31 @@ export default function ContractDetailPage() {
                     <div className="empty-state-icon">🔍</div>
                     <p>No clauses match your filters</p>
                     <p className="text-sm text-muted" style={{ marginTop: 4 }}>Try adjusting the risk level or clause type filters</p>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ marginTop: 'var(--space-3)' }}
+                      onClick={() => {
+                        setRiskFilter('all');
+                        setTypeFilter('all');
+                        setFlagFilter(null);
+                        setSearchText('');
+                      }}
+                    >
+                      Clear all filters
+                    </button>
                   </div>
                 )
               ) : (
                 <div id="clauses-list" className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   {filteredClauses.map((clause) => (
-                    <ClauseCard key={clause.id} clause={clause} highlight={searchText || undefined} />
+                    <ClauseCard
+                      key={clause.id}
+                      clause={clause}
+                      highlight={searchText || undefined}
+                      activeRiskFilter={riskFilter}
+                      activeTypeFilter={typeFilter}
+                      activeFlagFilter={flagFilter}
+                    />
                   ))}
                 </div>
               )}
@@ -352,20 +522,38 @@ export default function ContractDetailPage() {
         {/* Sidebar: metadata & risk summary */}
         {isReady && (
           <div style={{ position: 'sticky', top: 'calc(var(--topbar-height) + var(--space-8))', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {/* Risk Summary */}
+            {/* Risk Summary (interactive) */}
             <div className="card-elevated" style={{ padding: 'var(--space-5)' }}>
-              <h4 style={{ marginBottom: 'var(--space-4)', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Risk Summary</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                <h4 style={{ color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Risk Summary</h4>
+                <span className="text-xs text-muted">click to filter</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {(['high', 'medium', 'low'] as const).map((level) => {
                   const count = contract.risk_summary?.[level] ?? 0;
                   const total = clauses.length;
                   const pct = total > 0 ? (count / total) * 100 : 0;
                   const colors = { high: 'var(--color-risk-high)', medium: 'var(--color-risk-medium)', low: 'var(--color-risk-low)' };
+                  const isSelected = riskFilter === level;
                   return (
-                    <div key={level}>
+                    <div
+                      key={level}
+                      onClick={() => setRiskFilter(isSelected ? 'all' : level)}
+                      className={`clickable-pill ${isSelected ? 'active' : ''}`}
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: 'var(--radius-md)',
+                        background: isSelected ? 'var(--color-surface-2)' : 'transparent',
+                        border: isSelected ? `1px solid ${colors[level]}` : '1px solid transparent',
+                        boxShadow: isSelected ? `0 0 0 1px ${colors[level]}` : undefined,
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title={`Filter by ${level} risk`}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontSize: '0.8125rem', color: colors[level], fontWeight: 500 }}>
-                          {level.charAt(0).toUpperCase() + level.slice(1)} risk
+                        <span style={{ fontSize: '0.8125rem', color: colors[level], fontWeight: isSelected ? 700 : 500 }}>
+                          {level.charAt(0).toUpperCase() + level.slice(1)} risk {isSelected && '✓'}
                         </span>
                         <span style={{ fontSize: '0.8125rem', fontWeight: 700 }}>{count}</span>
                       </div>
@@ -413,16 +601,38 @@ export default function ContractDetailPage() {
               </div>
             )}
 
-            {/* Flags summary */}
+            {/* Flags summary (interactive) */}
             {clauses.some(c => c.flags.length > 0) && (
               <div className="card-elevated" style={{ padding: 'var(--space-5)' }}>
-                <h4 style={{ marginBottom: 'var(--space-4)', color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Detected Flags</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                  <h4 style={{ color: 'var(--color-text-secondary)', fontSize: '0.8125rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Detected Flags</h4>
+                  <span className="text-xs text-muted">click to filter</span>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[...new Set(clauses.flatMap(c => c.flags))].map(flag => {
                     const count = clauses.filter(c => c.flags.includes(flag)).length;
+                    const isSelected = flagFilter === flag;
                     return (
-                      <div key={flag} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8125rem', color: '#fca5a5' }}>⚠ {flag}</span>
+                      <div
+                        key={flag}
+                        onClick={() => setFlagFilter(isSelected ? null : flag)}
+                        className={`clickable-pill ${isSelected ? 'active' : ''}`}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '5px 8px',
+                          borderRadius: 'var(--radius-md)',
+                          background: isSelected ? 'var(--color-risk-high-bg)' : 'transparent',
+                          border: isSelected ? '1px solid var(--color-risk-high)' : '1px solid transparent',
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title={`Filter by flag "${flag}"`}
+                      >
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--color-risk-high)', fontWeight: isSelected ? 700 : 500 }}>
+                          ⚠ {flag} {isSelected && '✓'}
+                        </span>
                         <span className="tag" style={{ fontSize: '0.6875rem' }}>{count}</span>
                       </div>
                     );

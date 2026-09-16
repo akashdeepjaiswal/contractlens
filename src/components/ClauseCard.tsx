@@ -1,8 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type { Clause, ClauseType } from '@/lib/types';
-import { CLAUSE_TYPE_LABELS } from '@/lib/types';
+import type { Clause, ClauseType, RiskLevel } from '@/lib/types';
+import {
+  CLAUSE_TYPE_LABELS,
+  RISK_LEVEL_REASONS,
+  CLAUSE_TYPE_DESCRIPTIONS,
+  FLAG_DESCRIPTIONS,
+} from '@/lib/types';
 
 // Map clause types to colors (from CSS vars)
 const CLAUSE_TYPE_COLORS: Record<ClauseType, string> = {
@@ -69,6 +74,7 @@ function HighlightedText({ text, highlight }: { text: string; highlight?: string
   );
 }
 
+
 interface ClauseCardProps {
   clause: Clause;
   contractName?: string;
@@ -77,6 +83,9 @@ interface ClauseCardProps {
   similarity?: number;
   /** If provided, matching terms in title/content/resolved_context are highlighted */
   highlight?: string;
+  activeRiskFilter?: 'all' | 'high' | 'medium' | 'low';
+  activeTypeFilter?: 'all' | ClauseType;
+  activeFlagFilter?: string | null;
 }
 
 export default function ClauseCard({
@@ -86,6 +95,9 @@ export default function ClauseCard({
   defaultExpanded = false,
   similarity,
   highlight,
+  activeRiskFilter = 'all',
+  activeTypeFilter = 'all',
+  activeFlagFilter = null,
 }: ClauseCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [showResolved, setShowResolved] = useState(false);
@@ -94,12 +106,67 @@ export default function ClauseCard({
   const hasResolvedRefs = (clause.raw_references?.length ?? 0) > 0;
   const hasUnresolved = (clause.unresolved_references?.length ?? 0) > 0;
 
+  // Filter match booleans
+  const isRiskMatched = activeRiskFilter !== 'all' && clause.risk_level === activeRiskFilter;
+  const isTypeMatched = activeTypeFilter !== 'all' && clause.clause_type === activeTypeFilter;
+  const isFlagMatched = Boolean(activeFlagFilter && clause.flags.includes(activeFlagFilter));
+
   return (
     <div
       className={`clause-card ${expanded ? 'expanded' : ''}`}
       style={{ '--type-color': typeColor } as React.CSSProperties}
       id={`clause-${clause.id}`}
     >
+      {/* Active Filter Reason Banners */}
+      {isFlagMatched && activeFlagFilter && (
+        <div className="clause-reason-banner clause-flag">
+          <span style={{ fontSize: '1.125rem', flexShrink: 0 }}>⚠️</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-risk-high)', marginBottom: 2 }}>
+              Red Flag Match: {activeFlagFilter}
+            </p>
+            <p style={{ fontSize: '0.8125rem', lineHeight: 1.5 }}>
+              {FLAG_DESCRIPTIONS[activeFlagFilter] || 'Exposes your business to elevated legal or financial exposure.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isRiskMatched && !isFlagMatched && (
+        <div className={`clause-reason-banner risk-${clause.risk_level}`}>
+          <span style={{ fontSize: '1.125rem', flexShrink: 0 }}>{RISK_EMOJI[clause.risk_level]}</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+              Why this is {clause.risk_level} risk
+            </p>
+            <p style={{ fontSize: '0.8125rem', lineHeight: 1.5 }}>
+              {clause.flags.length > 0 && clause.risk_level === 'high' ? (
+                <>
+                  <strong>Flagged for {clause.flags.join(', ')}: </strong>
+                  {FLAG_DESCRIPTIONS[clause.flags[0]] || RISK_LEVEL_REASONS[clause.risk_level]}
+                </>
+              ) : (
+                RISK_LEVEL_REASONS[clause.risk_level]
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isTypeMatched && !isRiskMatched && !isFlagMatched && (
+        <div className="clause-reason-banner clause-type">
+          <span style={{ fontSize: '1.125rem', flexShrink: 0 }}>📌</span>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-primary-light)', marginBottom: 2 }}>
+              {CLAUSE_TYPE_LABELS[clause.clause_type]} Clause Scope
+            </p>
+            <p style={{ fontSize: '0.8125rem', lineHeight: 1.5 }}>
+              {CLAUSE_TYPE_DESCRIPTIONS[clause.clause_type] || 'Standard legal clause governing this section.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div
         style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', cursor: 'pointer' }}
@@ -118,18 +185,28 @@ export default function ClauseCard({
               style={{
                 background: `${typeColor}18`,
                 color: typeColor,
-                borderColor: `${typeColor}30`,
+                borderColor: isTypeMatched ? typeColor : `${typeColor}30`,
+                boxShadow: isTypeMatched ? `0 0 0 2px ${typeColor}, 0 0 10px ${typeColor}40` : undefined,
                 fontSize: '0.6875rem',
-                fontWeight: 600,
+                fontWeight: isTypeMatched ? 700 : 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
+                transition: 'all 0.2s',
               }}
             >
               {CLAUSE_TYPE_LABELS[clause.clause_type]}
             </span>
 
             {/* Risk level */}
-            <span className={`badge badge-risk-${clause.risk_level}`} style={{ fontSize: '0.6875rem' }}>
+            <span
+              className={`badge badge-risk-${clause.risk_level}`}
+              style={{
+                fontSize: '0.6875rem',
+                boxShadow: isRiskMatched ? `0 0 0 2px var(--color-risk-${clause.risk_level}), 0 0 10px var(--color-risk-${clause.risk_level}-bg)` : undefined,
+                fontWeight: isRiskMatched ? 700 : 500,
+                transition: 'all 0.2s',
+              }}
+            >
               {RISK_EMOJI[clause.risk_level]} {clause.risk_level} risk
             </span>
 
@@ -166,22 +243,27 @@ export default function ClauseCard({
           {/* Flags */}
           {clause.flags.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {clause.flags.map((flag) => (
-                <span
-                  key={flag}
-                  style={{
-                    fontSize: '0.6875rem',
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                    background: 'var(--color-risk-high-bg)',
-                    color: 'var(--color-risk-high)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    fontWeight: 500,
-                  }}
-                >
-                  ⚠ {flag}
-                </span>
-              ))}
+              {clause.flags.map((flag) => {
+                const isSelectedFlag = activeFlagFilter === flag;
+                return (
+                  <span
+                    key={flag}
+                    style={{
+                      fontSize: '0.6875rem',
+                      padding: '2px 7px',
+                      borderRadius: 4,
+                      background: isSelectedFlag ? 'var(--color-risk-high)' : 'var(--color-risk-high-bg)',
+                      color: isSelectedFlag ? '#ffffff' : 'var(--color-risk-high)',
+                      border: isSelectedFlag ? '1px solid var(--color-risk-high)' : '1px solid rgba(239, 68, 68, 0.2)',
+                      boxShadow: isSelectedFlag ? '0 0 0 2px rgba(239, 68, 68, 0.4), 0 0 10px rgba(239, 68, 68, 0.3)' : undefined,
+                      fontWeight: isSelectedFlag ? 700 : 500,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    ⚠ {flag}
+                  </span>
+                );
+              })}
             </div>
           )}
 
